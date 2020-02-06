@@ -1,4 +1,4 @@
-pragma solidity >=0.5.12 <0.7.0;
+pragma solidity >=0.6.0 <0.7.0;
 
 import "./Identity.sol";
 
@@ -9,9 +9,7 @@ contract RelayableIdentity is Identity {
 	/* keccak256("TxMessage(address signer,address to,uint256 value,bytes data,uint256 nonce)"); */
 	bytes32 constant TXMESSAGE_TYPEHASH = 0xd3a5dbc47f098f34f663b1d3b74bd4df78ba7e6428e04914120023dfcd11b99b;
 
-	/* keccak256(
-	   "Create2Message(address signer,uint256 value,uint256 salt,bytes initCode,uint256 nonce)"
-	   );*/
+	/* keccak256("Create2Message(address signer,uint256 value,uint256 salt,bytes initCode,uint256 nonce)"); */
 	bytes32 constant CREATE2MESSAGE_TYPEHASH = 0xc13a5d7d915160f35b84a9d8067ce023df85669f794516ca525ded719106da5b;
 
 	bytes32 DOMAIN_SEPARATOR;
@@ -19,7 +17,6 @@ contract RelayableIdentity is Identity {
 	// gas required to finish execution of relay() after internal call
 	uint constant REQUIRE_GAS_LEFT_AFTER_EXEC = 5000;
 
-	//to avoid replay
 	mapping(address => uint) public relayNonce;
 
 	event RelayedExecute (bool success);
@@ -32,10 +29,10 @@ contract RelayableIdentity is Identity {
 			id := chainid()
 		}
 
-		DOMAIN_SEPARATOR = hashEIP720Domain(address(this), id);
+		DOMAIN_SEPARATOR = hashEIP712Domain(address(this), id);
 	}
 
-	function hashEIP720Domain(address verifyingContract, uint256 chainId) internal pure returns (bytes32) {
+	function hashEIP712Domain(address verifyingContract, uint256 chainId) internal pure returns (bytes32) {
 		return keccak256(abi.encode(
 			EIP712DOMAIN_TYPEHASH,
 			verifyingContract,
@@ -66,13 +63,10 @@ contract RelayableIdentity is Identity {
 	}
 
 	function relayExecute(bytes memory sig, address signer, address destination, uint value, bytes memory data) public {
-		//the hash contains all of the information about the meta transaction to be called
 		bytes32 _hash = hashTxMessage(signer, destination, value, data);
 
-		//this makes sure signer signed correctly AND signer is whitelisted
 		require(signerIsWhitelisted(_hash,sig),"Signer is not whitelisted");
 
-		//increment the hash so this tx can't run again
 		relayNonce[signer]++;
 
 		uint remainingGas = gasleft();
@@ -82,21 +76,17 @@ contract RelayableIdentity is Identity {
 	}
 
 	function relayDeploy(bytes memory sig, address signer, uint256 value, bytes32 salt, bytes memory initCode) public {
-		//the hash contains all of the information about the meta transaction to be called
 		bytes32 _hash = hashCreateMessage(signer, value, salt, initCode);
 
-		//this makes sure signer signed correctly AND signer is whitelisted
 		require(signerIsWhitelisted(_hash,sig),"Signer is not whitelisted");
 
-		//increment the hash so this tx can't run again
 		relayNonce[signer]++;
 
 		address addr = executeCreate2(value, salt, initCode);
+
 		emit RelayedDeploy(addr);
 	}
 
-	//borrowed from OpenZeppelin's ESDA stuff:
-	//https://github.com/OpenZeppelin/openzeppelin-solidity/blob/master/contracts/cryptography/ECDSA.sol
 	function signerIsWhitelisted(bytes32 _hash, bytes memory _signature) internal view returns (bool){
 		bytes32 r;
 		bytes32 s;
@@ -122,10 +112,13 @@ contract RelayableIdentity is Identity {
 		if (v != 27 && v != 28) {
 			return false;
 		} else {
+			bytes32 digest = keccak256(abi.encodePacked(
+				"\x19\x01",
+				DOMAIN_SEPARATOR,
+				_hash
+			));
 			// solium-disable-next-line arg-overflow
-			return whitelist[ecrecover(keccak256(
-				abi.encodePacked("\x19Ethereum Signed Message:\n32", _hash)
-			), v, r, s)];
+			return whitelist[ecrecover(digest, v, r, s)];
 		}
 	}
 }

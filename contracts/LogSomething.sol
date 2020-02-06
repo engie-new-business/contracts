@@ -1,4 +1,4 @@
-pragma solidity >=0.4.22 <0.6.0;
+pragma solidity >=0.4.22 <0.7.0;
 
 contract LogSomething {
   event rememberThis(bytes32 _iMember);

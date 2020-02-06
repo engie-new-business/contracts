@@ -1,4 +1,4 @@
-pragma solidity >=0.5.0 <0.7.0;
+pragma solidity >=0.6.0 <0.7.0;
 
 interface IIdentity {
 	event Received (address indexed sender, uint value);
@@ -33,24 +33,24 @@ contract Identity is IIdentity {
 		return true;
 	}
 
-	function() external payable { emit Received(msg.sender, msg.value); }
+	receive() external payable { emit Received(msg.sender, msg.value); }
 
-	function getData(bytes32 _key) external view returns (bytes memory _value) {
+	function getData(bytes32 _key) override external view returns (bytes memory _value) {
 		return store[_key];
 	}
 
-	function setData(bytes32 _key, bytes calldata _value) external onlyWhitelisted {
+	function setData(bytes32 _key, bytes calldata _value) override external onlyWhitelisted {
 		store[_key] = _value;
 		emit DataChanged(_key, _value);
 	}
 
-	function execute(address destination, uint value, bytes calldata data) onlyWhitelisted external {
-		require(executeCall(gasleft(), destination, value, data));
+	function execute(address destination, uint value, bytes calldata data) override onlyWhitelisted external {
+		require(executeCall(gasleft(), destination, value, data), "call failed");
 	}
 
-	function deploy(uint256 value, bytes32 salt, bytes calldata initCode) onlyWhitelisted external returns (address) {
+	function deploy(uint256 value, bytes32 salt, bytes calldata initCode) override onlyWhitelisted external returns (address) {
 		address addr = executeCreate2(value, salt, initCode);
-		require(addr != address(0x0));
+		require(addr != address(0x0), "create2 failed");
 		return addr;
 	}
 
