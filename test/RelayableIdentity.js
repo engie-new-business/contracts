@@ -1,10 +1,10 @@
-const BouncerProxy = artifacts.require("BouncerProxy");
+const RelayableIdentity = artifacts.require("RelayableIdentity");
 const LogSomething = artifacts.require("LogSomething");
 
 // web3 injected by truffle
 
-contract('BouncerProxy contract', (accounts) => {
-  let BouncerProxyContract
+contract('RelayableIdentity contract', (accounts) => {
+  let RelayableIdentityContract
   let LogSomethingContract
 
   const RELAYER = accounts[0];
@@ -15,7 +15,7 @@ contract('BouncerProxy contract', (accounts) => {
     for (var i = 0; i < 5; i++) {
       EOAs[i] = web3.eth.accounts.create();
     }
-    BouncerProxyContract = await BouncerProxy.new(EOAs[0].address, {
+    RelayableIdentityContract = await RelayableIdentity.new(EOAs[0].address, {
       from: RELAYER
     });
     LogSomethingContract = await LogSomething.new({
@@ -24,7 +24,7 @@ contract('BouncerProxy contract', (accounts) => {
   });
 
   it('EOAs[0] should be whitelisted', async () => {
-    let res = await BouncerProxyContract.whitelist(EOAs[0].address)
+    let res = await RelayableIdentityContract.whitelist(EOAs[0].address)
     assert.isTrue(res)
   });
 
@@ -47,7 +47,7 @@ contract('BouncerProxy contract', (accounts) => {
 
   it('should whitelist EOAs[1]', async () => {
     await addToWhiteList(EOAs[1].address)
-    assert.isTrue(await BouncerProxyContract.whitelist(EOAs[1].address))
+    assert.isTrue(await RelayableIdentityContract.whitelist(EOAs[1].address))
   });
 
   it('first relay with new whitelisted should pass with 60 000 gas', async () => {
@@ -103,7 +103,7 @@ contract('BouncerProxy contract', (accounts) => {
   }
 
   async function getNonce(address) {
-    return await BouncerProxyContract.relayNonce(address)
+    return await RelayableIdentityContract.relayNonce(address)
   }
 
   async function dumbRelayTransaction(signer) {
@@ -112,28 +112,28 @@ contract('BouncerProxy contract', (accounts) => {
 
   async function estimatedGasInternal(destination, value, data) {
     return await web3.eth.estimateGas({
-      from: BouncerProxyContract.address,
+      from: RelayableIdentityContract.address,
       to: destination,
       value: value,
       data: data,
     })
   }
   async function estimatedGasForHash(signer, destination, value, data) {
-    return await BouncerProxyContract.contract.methods.getCallHash(signer.address, destination, value, data).estimateGas()
+    return await RelayableIdentityContract.contract.methods.hashTxMessage(signer.address, destination, value, data).estimateGas()
   }
 
   async function relayTransaction(signer, destination, value, data, gas) {
     let relayed = false
-    let message = await BouncerProxyContract.getCallHash(signer.address, destination, value, data)
+    let message = await RelayableIdentityContract.hashTxMessage(signer.address, destination, value, data)
 
     const sig = await signer.sign(message);
 
-    let res = await BouncerProxyContract.relay(sig.signature, signer.address, destination, value, data, {
+    let res = await RelayableIdentityContract.relayExecute(sig.signature, signer.address, destination, value, data, {
       from: RELAYER,
       gas: gas
     })
     for (var i = 0; i < res.logs.length; i++) {
-      if (res.logs[i].event == 'Relayed') {
+      if (res.logs[i].event == 'RelayedExecute') {
         relayed = res.logs[i].args.success
       }
     }
@@ -147,9 +147,9 @@ contract('BouncerProxy contract', (accounts) => {
 
   async function addToWhiteList(address) {
     let signer = EOAs[0]
-    let data = BouncerProxyContract.contract.methods.updateWhitelist(address, true).encodeABI()
+    let data = RelayableIdentityContract.contract.methods.updateWhitelist(address, true).encodeABI()
     let res = await signer.signTransaction({
-      to: BouncerProxyContract.address,
+      to: RelayableIdentityContract.address,
       value: '0',
       gas: 200000,
       gasPrice: 0,
