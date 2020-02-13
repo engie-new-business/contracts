@@ -2,6 +2,8 @@
 
 Rockside want to increase usage of your Blockchain applications. Like Stripe for online payment, Rockside is the platform for running custodial or non custodial Blockchain applications.
 
+See full documentations [here](http://docs.rockside.io)
+
 We use onchain identities and meta-transactions to simplify account and gas fee management.
 
 This repository contains the contracts deployed by Rockside.
