@@ -11,6 +11,7 @@ contract('RelayableIdentity contract', (accounts) => {
   let LogSomethingContract
 
   const RELAYER = accounts[0];
+  const MAXGAS = 6283185;
 
   let EOAs = []
 
@@ -37,7 +38,6 @@ contract('RelayableIdentity contract', (accounts) => {
     assert.isAbove(res.gasUsed, 50000)
     assert.isBelow(res.gasUsed, 60000)
     assert.isTrue(res.relayed)
-    console.log('consumed : ' + res.gasUsed);
   });
 
   it('second relay should pass with 50 000 gas', async () => {
@@ -45,7 +45,6 @@ contract('RelayableIdentity contract', (accounts) => {
 
     assert.isBelow(res.gasUsed, 50000)
     assert.isTrue(res.relayed)
-    console.log('consumed : ' + res.gasUsed);
   });
 
   it('should whitelist EOAs[1]', async () => {
@@ -59,7 +58,6 @@ contract('RelayableIdentity contract', (accounts) => {
     assert.isAbove(res.gasUsed, 50000)
     assert.isBelow(res.gasUsed, 60000)
     assert.isTrue(res.relayed)
-    console.log('consumed : ' + res.gasUsed);
   });
 
   it('we should estimate the gas properly', async () => {
@@ -85,6 +83,29 @@ contract('RelayableIdentity contract', (accounts) => {
       let res = await relayTransaction(signer, destination, value, data, gas)
       assert.isTrue(res.relayed)
     }
+  });
+
+  it('should be possible to add address to whitelist with metatx', async () => {
+    const signer = EOAs[0]
+    const newWL = EOAs[4]
+
+    let whitelisted = await RelayableIdentityContract.whitelist(signer.address)
+    assert.isTrue(whitelisted)
+    whitelisted = await RelayableIdentityContract.whitelist(newWL.address)
+    assert.isFalse(whitelisted)
+
+
+    let res = await relayTransaction(
+      signer,
+      RelayableIdentityContract.address,
+      0,
+      await RelayableIdentityContract.contract.methods.updateWhitelist(newWL.address, true).encodeABI(),
+      MAXGAS
+    )
+    assert.isTrue(res.relayed)
+
+    whitelisted = await RelayableIdentityContract.whitelist(newWL.address)
+    assert.isTrue(whitelisted)
   });
 
   function randomBytes32() {
@@ -160,6 +181,7 @@ contract('RelayableIdentity contract', (accounts) => {
     let result = {
       relayed: relayed,
       gasUsed: res.receipt.gasUsed,
+      receipt: res,
     }
 
     return result
@@ -185,6 +207,7 @@ const types = {
     { type: "uint256", name: "chainId" }
   ]
 };
+
 // Recursively finds all the dependencies of a type
 function dependencies(primaryType, found = []) {
     if (found.includes(primaryType)) {
