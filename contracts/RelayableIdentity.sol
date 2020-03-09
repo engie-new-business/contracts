@@ -30,6 +30,7 @@ contract RelayableIdentity is Identity {
 		}
 
 		DOMAIN_SEPARATOR = hashEIP712Domain(address(this), id);
+		whitelist[address(this)] = true;
 	}
 
 	function hashEIP712Domain(address verifyingContract, uint256 chainId) internal pure returns (bytes32) {
