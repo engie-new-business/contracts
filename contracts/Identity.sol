@@ -1,16 +1,6 @@
 pragma solidity >=0.6.0 <0.7.0;
 
-interface IIdentity {
-	event Received (address indexed sender, uint value);
-	event DataChanged(bytes32 indexed key, bytes value);
-	event Executed(address destination, uint256 value, bytes data);
-	event Deployed(uint256 value, bytes32 salt, bytes initCode);
-
-	function getData(bytes32 _key) external view returns (bytes memory _value);
-	function setData(bytes32 _key, bytes calldata _value) external;
-	function execute(address destination, uint value, bytes calldata data) external;
-	function deploy(uint256 value, bytes32 salt, bytes calldata initCode) external returns (address);
-}
+import "./IIdentity.sol";
 
 contract Identity is IIdentity {
 	mapping(bytes32 => bytes) store;
@@ -22,7 +12,7 @@ contract Identity is IIdentity {
 		whitelist[customerAccount] = true;
 	}
 
-	modifier onlyWhitelisted() {
+	modifier onlyWhitelisted() virtual {
 		require(whitelist[msg.sender],"Account Not Whitelisted");
 		_;
 	}
@@ -33,7 +23,7 @@ contract Identity is IIdentity {
 		return true;
 	}
 
-	receive() external payable { emit Received(msg.sender, msg.value); }
+	receive() external payable virtual { emit Received(msg.sender, msg.value); }
 
 	function getData(bytes32 _key) override external view returns (bytes memory _value) {
 		return store[_key];
