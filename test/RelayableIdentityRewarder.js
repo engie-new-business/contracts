@@ -40,8 +40,7 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
   it('first relay should pass with 100 000 gas', async () => {
     let res = await dumbRelayTransaction(EOAs[0])
     let gasPrice = (await web3.eth.getTransaction(res.receipt.tx)).gasPrice
-
-    assert.isAbove(res.gasUsed, 60000)
+    assert.isAbove(res.gasUsed, 50000)
     assert.isBelow(res.gasUsed, 100000)
     assert.isTrue(res.relayed)
     assert.isAbove(res.paymentGas, res.gasUsed)
@@ -84,11 +83,11 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
         gas += 20000 // for mapping entry creation, around 15000
       }
       gas += 15000 // for our safe exit
-      let hashGas = await estimatedGasForHash(signer, destination, value, data) - 21000 // for hash calculation
+      let hashGas = await estimatedGasForHash(signer, destination, value, data, 100000, 1) - 21000 // for hash calculation
       let internalGas = await estimatedGasInternal(destination, value, data) - 21000 // for internal
 
       gas = gas + hashGas + internalGas
-      let res = await relayTransaction(signer, destination, value, data, gas)
+      let res = await relayTransaction(signer, destination, value, data, 0, 1, gas)
       assert.isTrue(res.relayed)
       assert.isAbove(res.paymentGas, res.gasUsed)
     }
@@ -108,6 +107,8 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
       RelayableIdentityRewarderContract.address,
       0,
       await RelayableIdentityRewarderContract.contract.methods.updateWhitelist(newWL.address, true).encodeABI(),
+      0,
+      1,
       MAXGAS
     )
     assert.isTrue(res.relayed)
@@ -120,7 +121,7 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
   it('should deploy a contract', async () => {
     const signer = EOAs[0]
 
-    let res = await relayDeployTransaction(signer, 0, web3.utils.fromAscii("salt"), ERC20.bytecode)
+    let res = await relayDeployTransaction(signer, 0, web3.utils.fromAscii("salt"), ERC20.bytecode, 0, 1)
     assert.isAbove(res.paymentGas, res.gasUsed)
   });
 
@@ -147,7 +148,7 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
   }
 
   async function dumbRelayTransaction(signer) {
-    return await relayTransaction(signer, '0x0000000000000000000000000000000000000000', 0, '0x', 0)
+    return await relayTransaction(signer, '0x0000000000000000000000000000000000000000', 0, '0x', 0, 1, 0)
   }
 
   async function estimatedGasInternal(destination, value, data) {
@@ -158,14 +159,14 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
       data: data,
     })
   }
-  async function estimatedGasForHash(signer, destination, value, data) {
-    return await RelayableIdentityRewarderContract.contract.methods.hashTxMessage(signer.address, destination, value, data).estimateGas()
+  async function estimatedGasForHash(signer, destination, value, data, gasLimit, gasPrice) {
+    return await RelayableIdentityRewarderContract.contract.methods.hashTxMessage(signer.address, destination, value, data, gasLimit, gasPrice).estimateGas()
   }
 
-  async function relayTransaction(signer, destination, value, data, gas) {
+  async function relayTransaction(signer, destination, value, data, gasLimit, gasPrice, gas) {
     let relayed = false
     let payment = 0
-    let message = await RelayableIdentityRewarderContract.hashTxMessage(signer.address, destination, value, data)
+    let message = await RelayableIdentityRewarderContract.hashTxMessage(signer.address, destination, value, data, gasLimit, gasPrice)
 
     const chainID = await web3.eth.net.getId();
     const domain = {
@@ -186,9 +187,10 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
     const sig = await ethUtil.ecsign(messageToSign, privateKey);
     const signature = ethUtil.toRpcSig(sig.v, sig.r, sig.s);
 
-    let res = await RelayableIdentityRewarderContract.relayExecute(signature, signer.address, destination, value, data, 1, {
+    let res = await RelayableIdentityRewarderContract.relayExecute(signature, signer.address, destination, value, data, gasLimit, gasPrice, {
       from: RELAYER,
-      gas: gas
+      gas: gas,
+      gasPrice: gasPrice
     })
     let paymentBN
     for (var i = 0; i < res.logs.length; i++) {
@@ -197,13 +199,13 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
         paymentBN = res.logs[i].args.payment
       }
     }
-    let gasPrice = (await web3.eth.getTransaction(res.tx)).gasPrice
-    payment = paymentBN.div(new web3.utils.BN(gasPrice))
+    let actualGasPrice = (await web3.eth.getTransaction(res.tx)).gasPrice
+    payment = paymentBN.div(new web3.utils.BN(actualGasPrice))
     let result = {
       relayed: relayed,
       payment: paymentBN.toString(10),
       paymentGas: payment.toNumber(10),
-      gasPrice: gasPrice,
+      gasPrice: actualGasPrice,
       gasUsed: res.receipt.gasUsed,
       receipt: res,
     }
@@ -211,10 +213,10 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
     return result
   }
 
-  async function relayDeployTransaction(signer, value, salt, initCode) {
+  async function relayDeployTransaction(signer, value, salt, initCode, gasLimit, gasPrice) {
     let address = false
     let payment = 0
-    let message = await RelayableIdentityRewarderContract.hashCreateMessage(signer.address, value, salt, initCode)
+    let message = await RelayableIdentityRewarderContract.hashCreateMessage(signer.address, value, salt, initCode, gasLimit, gasPrice)
 
     const chainID = await web3.eth.net.getId();
     const domain = {
@@ -235,7 +237,7 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
     const sig = await ethUtil.ecsign(messageToSign, privateKey);
     const signature = ethUtil.toRpcSig(sig.v, sig.r, sig.s);
 
-    let res = await RelayableIdentityRewarderContract.relayDeploy(signature, signer.address, value, salt, initCode, 1, {
+    let res = await RelayableIdentityRewarderContract.relayDeploy(signature, signer.address, value, salt, initCode, gasLimit, gasPrice, {
       from: RELAYER,
     })
     let paymentBN
@@ -245,13 +247,13 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
         paymentBN = res.logs[i].args.payment
       }
     }
-    let gasPrice = (await web3.eth.getTransaction(res.tx)).gasPrice
-    payment = paymentBN.div(new web3.utils.BN(gasPrice))
+    let actualGasPrice = (await web3.eth.getTransaction(res.tx)).gasPrice
+    payment = paymentBN.div(new web3.utils.BN(actualGasPrice))
     let result = {
       address: address,
       payment: paymentBN.toString(10),
       paymentGas: payment.toNumber(10),
-      gasPrice: gasPrice,
+      gasPrice: actualGasPrice,
       gasUsed: res.receipt.gasUsed,
       receipt: res,
     }

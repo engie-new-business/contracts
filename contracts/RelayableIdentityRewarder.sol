@@ -44,50 +44,64 @@ contract RelayableIdentityRewarder is Identity {
 		));
 	}
 
-	function hashTxMessage(address signer, address destination, uint value, bytes memory data) public view returns (bytes32) {
+	function hashTxMessage(address signer, address destination, uint value, bytes memory data, uint256 gasLimit, uint256 gasPrice) public view returns (bytes32) {
 		return keccak256(abi.encode(
 			TXMESSAGE_TYPEHASH,
 			signer,
 			destination,
 			value,
 			keccak256(bytes(data)),
+			gasLimit,
+			gasPrice,
 			relayNonce[signer]
 		));
 	}
 
-	function hashCreateMessage(address signer, uint256 value, bytes32 salt, bytes memory initCode) public view returns (bytes32) {
+	function hashCreateMessage(address signer, uint256 value, bytes32 salt, bytes memory initCode, uint256 gasLimit, uint256 gasPrice) public view returns (bytes32) {
 		return keccak256(abi.encode(
 			CREATE2MESSAGE_TYPEHASH,
 			signer,
 			value,
 			salt,
 			keccak256(bytes(initCode)),
+			gasLimit,
+			gasPrice,
 			relayNonce[signer]
 		));
 	}
 
-	function relayExecute(bytes memory sig, address signer, address destination, uint value, bytes memory data, uint gasPrice) public {
+	function relayExecute(bytes memory sig, address signer, address destination, uint value, bytes memory data, uint gasLimit, uint gasPrice) public {
 		uint initialGas = gasleft();
-		bytes32 _hash = hashTxMessage(signer, destination, value, data);
+		require(tx.gasprice <= gasPrice || gasPrice == 0, "Tx gasPrice higher than agreed gasPrice");
+
+		bytes32 _hash = hashTxMessage(signer, destination, value, data, gasLimit, gasPrice);
 
 		require(signerIsWhitelisted(_hash,sig),"Signer is not whitelisted");
 
 		relayNonce[signer]++;
 
 		uint remainingGas = gasleft();
-		require(remainingGas > REQUIRE_GAS_LEFT_AFTER_EXEC);
+		require(remainingGas > REQUIRE_GAS_LEFT_AFTER_EXEC, "Execution cost exceeded gas limit");
 		bool success = executeCall(remainingGas - REQUIRE_GAS_LEFT_AFTER_EXEC, destination, value, data);
 
+		if(gasPrice == 0) {
+			emit RelayedExecute(success, 0);
+			return;
+		}
+
 		uint256 txSendCost = msg.data.length.mul(16).add(21000); // 21000 (transaction) + 64/4 (we assume that the quarter of data bytes are non zero) * msg.data.length
-		uint256 gasUsed = initialGas.sub(gasleft());
-		uint256 payment = handlePayment(gasUsed.add(txSendCost).add(REQUIRE_GAS_LEFT_AFTER_EXEC), gasPrice);
+		uint256 gasUsed = initialGas.sub(gasleft()).add(txSendCost).add(REQUIRE_GAS_LEFT_AFTER_EXEC);
+		require(gasUsed <=  gasLimit || gasLimit == 0, "Execution cost exceeded agreed gasLimit");
+		uint256 payment = handlePayment(gasUsed, gasPrice);
 
 		emit RelayedExecute(success, payment);
 	}
 
-	function relayDeploy(bytes memory sig, address signer, uint256 value, bytes32 salt, bytes memory initCode, uint gasPrice) public {
+	function relayDeploy(bytes memory sig, address signer, uint256 value, bytes32 salt, bytes memory initCode, uint gasLimit, uint gasPrice) public {
 		uint initialGas = gasleft();
-		bytes32 _hash = hashCreateMessage(signer, value, salt, initCode);
+		require(tx.gasprice <=  gasPrice || gasPrice == 0, "Tx gasPrice higher than agreed gasPrice");
+
+		bytes32 _hash = hashCreateMessage(signer, value, salt, initCode, gasLimit, gasPrice);
 
 		require(signerIsWhitelisted(_hash,sig),"Signer is not whitelisted");
 
@@ -95,8 +109,14 @@ contract RelayableIdentityRewarder is Identity {
 
 		address addr = executeCreate2(value, salt, initCode);
 
+		if(gasPrice == 0) {
+			emit RelayedDeploy(addr, 0);
+			return;
+		}
+
 		uint256 txSendCost = msg.data.length.mul(64).add(21000); // 21000 (transaction) + 64 (we assume that all data bytes are non zero) * msg.data.length
-		uint256 gasUsed = initialGas.sub(gasleft());
+		uint256 gasUsed = initialGas.sub(gasleft()).add(txSendCost).add(REQUIRE_GAS_LEFT_AFTER_EXEC);
+		require(gasUsed <=  gasLimit || gasLimit == 0, "Execution cost exceeded agreed gasLimit");
 		uint256 payment = handlePayment(gasUsed.add(txSendCost).add(REQUIRE_GAS_LEFT_AFTER_EXEC), gasPrice);
 
 		emit RelayedDeploy(addr, payment);
@@ -109,10 +129,7 @@ contract RelayableIdentityRewarder is Identity {
 		private
 		returns (uint256)
 	{
-		if(gasPrice == 0) {
-			return 0;
-		}
-		uint256 payment = consumed.mul(tx.gasprice);
+		uint256 payment = consumed.mul(gasPrice);
 
 		require(msg.sender.send(payment), "Could not pay gas costs with ether");
 
