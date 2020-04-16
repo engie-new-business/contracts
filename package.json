@@ -10,7 +10,9 @@
     "ethereumjs-util": "^6.2.0",
     "truffle": "^5.1.11"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "@openzeppelin/contracts": "^3.0.0-rc.0"
+  },
   "scripts": {
     "test": "truffle test"
   },
