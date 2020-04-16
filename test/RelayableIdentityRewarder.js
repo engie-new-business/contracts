@@ -1,7 +1,7 @@
 const ethUtil = require('ethereumjs-util');
 const abi = require('ethereumjs-abi');
 const ethTypedData = require('eth-typed-data');
-const RelayableIdentityRewarder = artifacts.require("RelayableIdentityRewarder");
+const RelayableIdentityRewarder = artifacts.require("RelayableIdentity");
 const LogSomething = artifacts.require("LogSomething");
 const ERC20 = artifacts.require("DummyERC20");
 
@@ -39,6 +39,7 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
 
   it('first relay should pass with 100 000 gas', async () => {
     let res = await dumbRelayTransaction(EOAs[0])
+
     let gasPrice = (await web3.eth.getTransaction(res.receipt.tx)).gasPrice
     assert.isAbove(res.gasUsed, 50000)
     assert.isBelow(res.gasUsed, 100000)
@@ -50,7 +51,7 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
     let res = await dumbRelayTransaction(EOAs[0])
     let gasPrice = (await web3.eth.getTransaction(res.receipt.tx)).gasPrice
 
-    assert.isBelow(res.gasUsed, 60000)
+    assert.isBelow(res.gasUsed, 70000)
     assert.isTrue(res.relayed)
     assert.isAbove(res.paymentGas, res.gasUsed)
   });
@@ -69,6 +70,42 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
     assert.isAbove(res.paymentGas, res.gasUsed)
   });
 
+  it('should order transactions inside the same batch', async () => {
+    const signer = EOAs[0];
+    await addToWhiteList(signer.address)
+
+
+    const nonce = 100n;
+
+    const sendTx = async (batchNonce) => {
+      const nonceValue = BigInt(batchNonce) + (nonce * (2n ** 128n));
+
+      return await relayTransaction(
+        signer,
+        RelayableIdentityRewarderContract.address,
+        0,
+        '0x',
+        0,
+        1,
+        100000,
+        '0x' + nonceValue.toString(16)
+      )
+    }
+    let res = await sendTx(0);
+    assert.isTrue(res.relayed)
+    let didCatch = false;
+    try {
+      res = await sendTx(2);
+    } catch (err) {
+      didCatch = true
+    }
+    assert.isTrue(didCatch);
+    res = await sendTx(1);
+    assert.isTrue(res.relayed)
+    res = await sendTx(2);
+    assert.isTrue(res.relayed)
+  });
+
   it('we should estimate the gas properly', async () => {
     const signer = EOAs[2]
     await addToWhiteList(signer.address)
@@ -79,15 +116,12 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
       const data = await dataForLogSomething(Array(i).fill(randomBytes32()))
 
       let gas = 40000 + 21000 // for our deterministic code + 21 000 for tx
-      if (await getNonce(signer.address) == 0) {
-        gas += 20000 // for mapping entry creation, around 15000
-      }
       gas += 15000 // for our safe exit
-      let hashGas = await estimatedGasForHash(signer, destination, value, data, 100000, 1) - 21000 // for hash calculation
+      let hashGas = await estimatedGasForHash(signer, destination, value, data, 100000, 1, getRandomNonce()) - 21000 // for hash calculation
       let internalGas = await estimatedGasInternal(destination, value, data) - 21000 // for internal
 
       gas = gas + hashGas + internalGas
-      let res = await relayTransaction(signer, destination, value, data, 0, 1, gas)
+      let res = await relayTransaction(signer, destination, value, data, 0, 1, gas, getRandomNonce())
       assert.isTrue(res.relayed)
       assert.isAbove(res.paymentGas, res.gasUsed)
     }
@@ -109,7 +143,8 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
       await RelayableIdentityRewarderContract.contract.methods.updateWhitelist(newWL.address, true).encodeABI(),
       0,
       1,
-      MAXGAS
+      MAXGAS,
+      getRandomNonce(),
     )
     assert.isTrue(res.relayed)
 
@@ -118,10 +153,11 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
     assert.isAbove(res.paymentGas, res.gasUsed)
   });
 
+
   it('should deploy a contract', async () => {
     const signer = EOAs[0]
 
-    let res = await relayDeployTransaction(signer, 0, web3.utils.fromAscii("salt"), ERC20.bytecode, 0, 1)
+    let res = await relayDeployTransaction(signer, 0, web3.utils.fromAscii("salt"), ERC20.bytecode, 0, 1, getRandomNonce())
     assert.isAbove(res.paymentGas, res.gasUsed)
   });
 
@@ -143,12 +179,14 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
     return await LogSomethingContract.contract.methods.doDumbStuff(data).encodeABI()
   }
 
-  async function getNonce(address) {
-    return await RelayableIdentityRewarderContract.relayNonce(address)
+  async function dumbRelayTransaction(signer) {
+    return await relayTransaction(signer, '0x0000000000000000000000000000000000000000', 0, '0x', 0, 1, 0, getRandomNonce())
   }
 
-  async function dumbRelayTransaction(signer) {
-    return await relayTransaction(signer, '0x0000000000000000000000000000000000000000', 0, '0x', 0, 1, 0)
+  function getRandomNonce() {
+    const channel = Math.ceil(Math.random() * 1000000);
+    const nonce = BigInt(channel) * 2n**218n;
+    return '0x' + nonce.toString(16);
   }
 
   async function estimatedGasInternal(destination, value, data) {
@@ -159,14 +197,14 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
       data: data,
     })
   }
-  async function estimatedGasForHash(signer, destination, value, data, gasLimit, gasPrice) {
-    return await RelayableIdentityRewarderContract.contract.methods.hashTxMessage(signer.address, destination, value, data, gasLimit, gasPrice).estimateGas()
+  async function estimatedGasForHash(signer, destination, value, data, gasLimit, gasPrice, nonce) {
+    return await RelayableIdentityRewarderContract.contract.methods.hashTxMessage(signer.address, destination, value, data, gasLimit, gasPrice, nonce).estimateGas()
   }
 
-  async function relayTransaction(signer, destination, value, data, gasLimit, gasPrice, gas) {
+  async function relayTransaction(signer, destination, value, data, gasLimit, gasPrice, gas, nonce) {
     let relayed = false
     let payment = 0
-    let message = await RelayableIdentityRewarderContract.hashTxMessage(signer.address, destination, value, data, gasLimit, gasPrice)
+    let message = await RelayableIdentityRewarderContract.hashTxMessage(signer.address, destination, value, data, gasLimit, gasPrice, nonce)
 
     const chainID = await web3.eth.net.getId();
     const domain = {
@@ -187,7 +225,7 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
     const sig = await ethUtil.ecsign(messageToSign, privateKey);
     const signature = ethUtil.toRpcSig(sig.v, sig.r, sig.s);
 
-    let res = await RelayableIdentityRewarderContract.relayExecute(signature, signer.address, destination, value, data, gasLimit, gasPrice, {
+    let res = await RelayableIdentityRewarderContract.relayExecute(signature, signer.address, destination, value, data, gasLimit, gasPrice, nonce, {
       from: RELAYER,
       gas: gas,
       gasPrice: gasPrice
@@ -213,10 +251,10 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
     return result
   }
 
-  async function relayDeployTransaction(signer, value, salt, initCode, gasLimit, gasPrice) {
+  async function relayDeployTransaction(signer, value, salt, initCode, gasLimit, gasPrice, nonce) {
     let address = false
     let payment = 0
-    let message = await RelayableIdentityRewarderContract.hashCreateMessage(signer.address, value, salt, initCode, gasLimit, gasPrice)
+    let message = await RelayableIdentityRewarderContract.hashCreateMessage(signer.address, value, salt, initCode, gasLimit, gasPrice, nonce)
 
     const chainID = await web3.eth.net.getId();
     const domain = {
@@ -237,7 +275,7 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
     const sig = await ethUtil.ecsign(messageToSign, privateKey);
     const signature = ethUtil.toRpcSig(sig.v, sig.r, sig.s);
 
-    let res = await RelayableIdentityRewarderContract.relayDeploy(signature, signer.address, value, salt, initCode, gasLimit, gasPrice, {
+    let res = await RelayableIdentityRewarderContract.relayDeploy(signature, signer.address, value, salt, initCode, gasLimit, gasPrice, nonce, {
       from: RELAYER,
     })
     let paymentBN
