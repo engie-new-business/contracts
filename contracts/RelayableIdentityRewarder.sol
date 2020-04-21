@@ -1,19 +1,21 @@
 pragma solidity >=0.6.0 <0.7.0;
 
 import "./Identity.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
+import "./SafeMath.sol";
 
-contract RelayableIdentityRewarder is Identity {
+contract RelayableIdentity is Identity {
 	using SafeMath for uint256;
 
 	/* keccak256("EIP712Domain(address verifyingContract,uint256 chainId)"); */
 	bytes32 constant EIP712DOMAIN_TYPEHASH = 0xa1f4e2f207746c24e01c8e10e467322f5fea4cccab3cd2f1c95d700b6a0c218b;
 
+	/* keccak256("TxMessage(address signer,address to,uint256 value,bytes data,uint256 gasLimit,uint256 gasPrice,uint256 nonce)"); */
 	/* keccak256("TxMessage(address signer,address to,uint256 value,bytes data,uint256 nonce)"); */
-	bytes32 constant TXMESSAGE_TYPEHASH = 0xd3a5dbc47f098f34f663b1d3b74bd4df78ba7e6428e04914120023dfcd11b99b;
+	bytes32 constant TXMESSAGE_TYPEHASH = 0x2ae8ea62809c4b9c1535dabc234f463e45027d8653eaad956a8fa87150e2feaa;
 
+	/* keccak256("Create2Message(address signer,uint256 value,uint256 salt,bytes initCode,uint256 gasLimit,uint256 gasPrice,uint256 nonce)"); */
 	/* keccak256("Create2Message(address signer,uint256 value,uint256 salt,bytes initCode,uint256 nonce)"); */
-	bytes32 constant CREATE2MESSAGE_TYPEHASH = 0xc13a5d7d915160f35b84a9d8067ce023df85669f794516ca525ded719106da5b;
+	bytes32 constant CREATE2MESSAGE_TYPEHASH = 0xb39e22766dae88be82e00ce8d50150948a3d168e6e0941d9434024990d6d7820;
 
 	bytes32 DOMAIN_SEPARATOR;
 
@@ -91,7 +93,7 @@ contract RelayableIdentityRewarder is Identity {
 
 		uint256 txSendCost = msg.data.length.mul(16).add(21000); // 21000 (transaction) + 64/4 (we assume that the quarter of data bytes are non zero) * msg.data.length
 		uint256 gasUsed = initialGas.sub(gasleft()).add(txSendCost).add(REQUIRE_GAS_LEFT_AFTER_EXEC);
-		require(gasUsed <=  gasLimit || gasLimit == 0, "Execution cost exceeded agreed gasLimit");
+		require(gasUsed <=  gasLimit || gasLimit == 0 || gasPrice == 0, "Execution cost exceeded agreed gasLimit");
 		uint256 payment = handlePayment(gasUsed, gasPrice);
 
 		emit RelayedExecute(success, payment);
