@@ -22,8 +22,6 @@ contract RelayableIdentity is Identity {
 	// gas required to finish execution of relay and payment after internal call
 	uint constant REQUIRE_GAS_LEFT_AFTER_EXEC = 15000;
 
-	mapping(address => uint) public relayNonce;
-
 	event RelayedExecute (bool success, uint256 payment);
 	event RelayedDeploy (address contractAddress, uint256 payment);
 
@@ -46,7 +44,7 @@ contract RelayableIdentity is Identity {
 		));
 	}
 
-	function hashTxMessage(address signer, address destination, uint value, bytes memory data, uint256 gasLimit, uint256 gasPrice) public view returns (bytes32) {
+	function hashTxMessage(address signer, address destination, uint value, bytes memory data, uint256 gasLimit, uint256 gasPrice, uint256 nonce) public pure returns (bytes32) {
 		return keccak256(abi.encode(
 			TXMESSAGE_TYPEHASH,
 			signer,
@@ -55,11 +53,11 @@ contract RelayableIdentity is Identity {
 			keccak256(bytes(data)),
 			gasLimit,
 			gasPrice,
-			relayNonce[signer]
+			nonce
 		));
 	}
 
-	function hashCreateMessage(address signer, uint256 value, bytes32 salt, bytes memory initCode, uint256 gasLimit, uint256 gasPrice) public view returns (bytes32) {
+	function hashCreateMessage(address signer, uint256 value, bytes32 salt, bytes memory initCode, uint256 gasLimit, uint256 gasPrice, uint256 nonce) public pure returns (bytes32) {
 		return keccak256(abi.encode(
 			CREATE2MESSAGE_TYPEHASH,
 			signer,
@@ -68,19 +66,18 @@ contract RelayableIdentity is Identity {
 			keccak256(bytes(initCode)),
 			gasLimit,
 			gasPrice,
-			relayNonce[signer]
+			nonce
 		));
 	}
 
-	function relayExecute(bytes memory sig, address signer, address destination, uint value, bytes memory data, uint gasLimit, uint gasPrice) public {
+	function relayExecute(bytes memory sig, address signer, address destination, uint value, bytes memory data, uint gasLimit, uint gasPrice, uint256 nonce) public {
 		uint initialGas = gasleft();
 		require(tx.gasprice <= gasPrice || gasPrice == 0, "Tx gasPrice higher than agreed gasPrice");
 
-		bytes32 _hash = hashTxMessage(signer, destination, value, data, gasLimit, gasPrice);
+		bytes32 _hash = hashTxMessage(signer, destination, value, data, gasLimit, gasPrice, nonce);
 
 		require(signerIsWhitelisted(_hash,sig),"Signer is not whitelisted");
-
-		relayNonce[signer]++;
+		require(checkAndUpdateNonce(signer, nonce), "Nonce is invalid");
 
 		uint remainingGas = gasleft();
 		require(remainingGas > REQUIRE_GAS_LEFT_AFTER_EXEC, "Execution cost exceeded gas limit");
@@ -99,15 +96,14 @@ contract RelayableIdentity is Identity {
 		emit RelayedExecute(success, payment);
 	}
 
-	function relayDeploy(bytes memory sig, address signer, uint256 value, bytes32 salt, bytes memory initCode, uint gasLimit, uint gasPrice) public {
+	function relayDeploy(bytes memory sig, address signer, uint256 value, bytes32 salt, bytes memory initCode, uint gasLimit, uint gasPrice, uint256 nonce) public {
 		uint initialGas = gasleft();
 		require(tx.gasprice <=  gasPrice || gasPrice == 0, "Tx gasPrice higher than agreed gasPrice");
 
-		bytes32 _hash = hashCreateMessage(signer, value, salt, initCode, gasLimit, gasPrice);
+		bytes32 _hash = hashCreateMessage(signer, value, salt, initCode, gasLimit, gasPrice, nonce);
 
 		require(signerIsWhitelisted(_hash,sig),"Signer is not whitelisted");
-
-		relayNonce[signer]++;
+		require(checkAndUpdateNonce(signer, nonce), "Nonce is invalid");
 
 		address addr = executeCreate2(value, salt, initCode);
 
@@ -136,6 +132,20 @@ contract RelayableIdentity is Identity {
 		require(msg.sender.send(payment), "Could not pay gas costs with ether");
 
 	    return payment;
+	}
+
+	mapping(address => mapping(uint128 => uint128)) public channels;
+
+	function checkAndUpdateNonce(address signer, uint256 nonce) internal returns (bool) {
+		uint128 channelId = uint128(nonce / 2**128);
+		uint128 channelNonce = uint128(nonce % 2**128);
+
+		uint128 currentNonce = channels[signer][channelId];
+		if (channelNonce == currentNonce) {
+			channels[signer][channelId]++;
+			return true;
+		}
+		return false;
 	}
 
 	function signerIsWhitelisted(bytes32 _hash, bytes memory _signature) internal view returns (bool){
