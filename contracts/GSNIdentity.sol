@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/GSN/IRelayHub.sol";
 
 contract GSNIdentity is Identity, GSNRecipient {
 	modifier onlyWhitelisted() override {
-		require(whitelist[_msgSender()],"Account Not Whitelisted");
+		require(whitelist[_msgSender()], "Account Not Whitelisted");
 		_;
 	}
 
