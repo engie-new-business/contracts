@@ -66,10 +66,6 @@ contract RelayableIdentity is Identity {
 		public
 	{
 		uint _initialGas = gasleft();
-		require(
-			tx.gasprice <= gasPrice || gasPrice == 0,
-			"Tx gasPrice higher than agreed gasPrice"
-		);
 
 		bytes32 _hash = hashTxMessage(
 			signer,
@@ -110,7 +106,7 @@ contract RelayableIdentity is Identity {
 			.add(_txSendCost)
 			.add(REQUIRE_GAS_LEFT_AFTER_EXEC);
 		require(
-			gasUsed <=  gasLimit || gasLimit == 0 || gasPrice == 0,
+			gasUsed <= gasLimit || gasLimit == 0 || gasPrice == 0,
 			"Execution cost exceeded agreed gasLimit"
 		);
 
@@ -140,10 +136,6 @@ contract RelayableIdentity is Identity {
 		public
 	{
 		uint _initialGas = gasleft();
-		require(
-			tx.gasprice <=  gasPrice || gasPrice == 0,
-			"Tx gasPrice higher than agreed gasPrice"
-		);
 
 		bytes32 _hash = hashCreateMessage(
 			signer,
@@ -174,7 +166,7 @@ contract RelayableIdentity is Identity {
 			.add(_txSendCost)
 			.add(REQUIRE_GAS_LEFT_AFTER_EXEC);
 		require(
-			gasUsed <=  gasLimit || gasLimit == 0,
+			gasUsed <= gasLimit || gasLimit == 0,
 			"Execution cost exceeded agreed gasLimit"
 		);
 
