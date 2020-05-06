@@ -112,7 +112,7 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
     const destination = LogSomethingContract.address
     const value = 0
 
-    for (var i = 0; i <= 100; i = i + 1) {
+    for (var i = 0; i <= 2; i = i + 1) {
       const data = await dataForLogSomething(Array(i).fill(randomBytes32()))
 
       let gas = 40000 + 21000 // for our deterministic code + 21 000 for tx
@@ -159,6 +159,58 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
 
     let res = await relayDeployTransaction(signer, 0, web3.utils.fromAscii("salt"), ERC20.bytecode, 0, 1, getRandomNonce())
     assert.isAbove(res.paymentGas, res.gasUsed)
+  });
+
+  describe('batch', async () => {
+    const buildCall = ({ to, value, data }) => {
+      return [to, value, data];
+    };
+
+    it('should relay a batch call', async () => {
+      const signer = EOAs[0]
+
+      const data = [];
+      const destination = '0x0000000000000000000000000000000000000000';
+      const firstCall = buildCall({ to: destination, value: 0, data });
+      const secondCall = buildCall({ to: destination, value: 0, data });
+
+      const res = await relayTransaction(
+        signer,
+        RelayableIdentityRewarderContract.address,
+        0,
+        await RelayableIdentityRewarderContract.contract.methods.batch([firstCall, secondCall]).encodeABI(),
+        0,
+        1,
+        MAXGAS,
+        getRandomNonce(),
+      )
+
+      assert.isTrue(res.relayed)
+    });
+
+    it('it should fail relay if one of the transaction fails', async () => {
+      const signer = EOAs[0]
+
+      const data = [];
+      const destination = '0x0000000000000000000000000000000000000000';
+      const tooMuchEther = getRandomNonce()
+      const firstCall = buildCall({ to: destination, value: tooMuchEther, data });
+      const secondCall = buildCall({ to: destination, value: 0, data });
+
+      const res = await relayTransaction(
+        signer,
+        RelayableIdentityRewarderContract.address,
+        0,
+        await RelayableIdentityRewarderContract.contract.methods.batch([firstCall, secondCall]).encodeABI(),
+        0,
+        1,
+        MAXGAS,
+        getRandomNonce(),
+      )
+
+      assert.isFalse(res.relayed)
+    })
+
   });
 
   function randomBytes32() {

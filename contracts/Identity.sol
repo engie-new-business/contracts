@@ -1,4 +1,5 @@
 pragma solidity >=0.6.0 <0.7.0;
+pragma experimental ABIEncoderV2;
 
 import "./IIdentity.sol";
 
@@ -28,8 +29,8 @@ contract Identity is IIdentity {
 	/// @param to Destination address for the call .
 	/// @param value Ether value for the call.
 	/// @param data Data payload for the call.
-	function execute(address to, uint value, bytes calldata data)
-		external
+	function execute(address to, uint value, bytes memory data)
+		public
 		override
 		onlyWhitelisted
 	{
@@ -52,6 +53,27 @@ contract Identity is IIdentity {
 		address addr = executeCreate2(value, salt, initCode);
 		require(addr != address(0x0), "create2 failed");
 		return addr;
+	}
+
+	struct Call {
+		address to;
+		uint256 value;
+		bytes data;
+	}
+
+	/// @dev Batch meta transactions to be executed as a single atomic transaction
+	/// @param calls list of calls to execute
+	function batch(Call[] memory calls)
+		public
+		onlyWhitelisted
+	{
+		for (uint i = 0; i < calls.length; i++) {
+			execute(
+				calls[i].to,
+				calls[i].value,
+				calls[i].data
+			);
+		}
 	}
 
 	/// @dev Store some data if the the sender is whitelisted.
