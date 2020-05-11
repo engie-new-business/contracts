@@ -3,10 +3,11 @@ pragma experimental ABIEncoderV2;
 
 import "./Identity.sol";
 import "./SafeMath.sol";
+import "./ERC165/ERC165.sol";
 
 /// @title On chain identity capable to receive relayed transaction
 /// @author Rockside dev team (tech@rockside.io)
-contract RelayableIdentity is Identity {
+contract RelayableIdentity is Identity, ERC165 {
 	using SafeMath for uint256;
 
 	// keccak256("EIP712Domain(address verifyingContract,uint256 chainId)")
@@ -23,6 +24,9 @@ contract RelayableIdentity is Identity {
 
 	bytes32 DOMAIN_SEPARATOR;
 
+	bytes4 private constant _INTERFACE_ID_IDENTITY = 0xfb07fcd2;
+	bytes4 private constant _INTERFACE_ID_RELAYER = 0xbc474218;
+
 	// gas required to finish execution of relay and payment after internal call
 	uint constant REQUIRE_GAS_LEFT_AFTER_EXEC = 15000;
 
@@ -30,7 +34,6 @@ contract RelayableIdentity is Identity {
 
 	event RelayedExecute (bool success, uint256 payment);
 	event RelayedDeploy (address contractAddress, uint256 payment);
-
 
  	/// @dev Initializes the contract and whitelist the owner and itself.
 	/// @param owner Address of the owner.
@@ -43,6 +46,9 @@ contract RelayableIdentity is Identity {
 
 		DOMAIN_SEPARATOR = hashEIP712Domain(address(this), id);
 		whitelist[address(this)] = true;
+
+		_registerInterface(_INTERFACE_ID_IDENTITY);
+		_registerInterface(_INTERFACE_ID_RELAYER);
 	}
 
 	/// @dev Relay a transaction and then pays the relayer.
