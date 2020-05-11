@@ -2,12 +2,13 @@ pragma solidity >=0.6.0 <0.7.0;
 pragma experimental ABIEncoderV2;
 
 import "./Identity.sol";
+import "./IRelayer.sol";
 import "./SafeMath.sol";
 import "./ERC165/ERC165.sol";
 
 /// @title On chain identity capable to receive relayed transaction
 /// @author Rockside dev team (tech@rockside.io)
-contract RelayableIdentity is Identity, ERC165 {
+contract RelayableIdentity is Identity, IRelayer, ERC165 {
 	using SafeMath for uint256;
 
 	// keccak256("EIP712Domain(address verifyingContract,uint256 chainId)")
@@ -71,6 +72,7 @@ contract RelayableIdentity is Identity, ERC165 {
 		uint256 nonce
 	)
 		public
+		override
 	{
 		uint _initialGas = gasleft();
 
@@ -141,6 +143,7 @@ contract RelayableIdentity is Identity, ERC165 {
 		uint256 nonce
 	)
 		public
+		override
 	{
 		uint _initialGas = gasleft();
 
