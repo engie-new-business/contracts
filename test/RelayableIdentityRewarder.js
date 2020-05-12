@@ -250,13 +250,13 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
     })
   }
   async function estimatedGasForHash(signer, destination, value, data, gasLimit, gasPrice, nonce) {
-    return await RelayableIdentityRewarderContract.contract.methods.hashTxMessage(signer.address, destination, value, data, gasLimit, gasPrice, nonce).estimateGas()
+    return await RelayableIdentityRewarderContract.contract.methods.hashTxMessage(RELAYER, signer.address, destination, value, data, gasLimit, gasPrice, nonce).estimateGas()
   }
 
   async function relayTransaction(signer, destination, value, data, gasLimit, gasPrice, gas, nonce) {
     let relayed = false
     let payment = 0
-    let message = await RelayableIdentityRewarderContract.hashTxMessage(signer.address, destination, value, data, gasLimit, gasPrice, nonce)
+    let message = await RelayableIdentityRewarderContract.hashTxMessage(RELAYER, signer.address, destination, value, data, gasLimit, gasPrice, nonce)
 
     const chainID = await web3.eth.net.getId();
     const domain = {
@@ -277,7 +277,7 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
     const sig = await ethUtil.ecsign(messageToSign, privateKey);
     const signature = ethUtil.toRpcSig(sig.v, sig.r, sig.s);
 
-    let res = await RelayableIdentityRewarderContract.relayExecute(signature, signer.address, destination, value, data, gasLimit, gasPrice, nonce, {
+    let res = await RelayableIdentityRewarderContract.relayExecute(signature, RELAYER, signer.address, destination, value, data, gasLimit, gasPrice, nonce, {
       from: RELAYER,
       gas: gas,
       gasPrice: gasPrice
@@ -306,7 +306,7 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
   async function relayDeployTransaction(signer, value, salt, initCode, gasLimit, gasPrice, nonce) {
     let address = false
     let payment = 0
-    let message = await RelayableIdentityRewarderContract.hashCreateMessage(signer.address, value, salt, initCode, gasLimit, gasPrice, nonce)
+    let message = await RelayableIdentityRewarderContract.hashCreateMessage(RELAYER, signer.address, value, salt, initCode, gasLimit, gasPrice, nonce)
 
     const chainID = await web3.eth.net.getId();
     const domain = {
@@ -327,7 +327,7 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
     const sig = await ethUtil.ecsign(messageToSign, privateKey);
     const signature = ethUtil.toRpcSig(sig.v, sig.r, sig.s);
 
-    let res = await RelayableIdentityRewarderContract.relayDeploy(signature, signer.address, value, salt, initCode, gasLimit, gasPrice, nonce, {
+    let res = await RelayableIdentityRewarderContract.relayDeploy(signature, RELAYER, signer.address, value, salt, initCode, gasLimit, gasPrice, nonce, {
       from: RELAYER,
     })
     let paymentBN
