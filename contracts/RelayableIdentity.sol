@@ -294,7 +294,7 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 		internal
 		returns (uint256)
 	{
-		uint256 payment = consumed.mul(gasPrice);
+		uint256 payment = consumed.mul(tx.gasprice < gasPrice ? tx.gasprice : gasPrice);
 
 		require(msg.sender.send(payment), "Could not pay gas costs with ether");
 
