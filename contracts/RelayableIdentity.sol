@@ -93,10 +93,6 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 			"Signer is not whitelisted"
 		);
 		require(checkAndUpdateNonce(signer, nonce), "Nonce is invalid");
-		require(
-			relayer == msg.sender || relayer != address(0),
-			"Invalid relayer"
-		);
 
 		uint _remainingGas = gasleft();
 		require(
