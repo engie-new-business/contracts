@@ -1,11 +1,25 @@
 pragma solidity >=0.6.0 <0.7.0;
-pragma experimental ABIEncoderV2;
 
 import "./IRelayer.sol";
 import "./SafeMath.sol";
+import "./Whitelist.sol";
 
 contract Forwarder {
 	using SafeMath for uint256;
+	Whitelist whitelist;
+
+    modifier isWhitelisted {
+        require(whitelist.verify(msg.sender), "Invalid sender");
+        _;
+    }
+
+    constructor(address whitelistAddress) public {
+        whitelist = Whitelist(whitelistAddress);
+    }
+
+	function changeWhitelistSource(address whitelistAddress) isWhitelisted public {
+        whitelist = Whitelist(whitelistAddress);
+	}
 
 	receive() external payable { }
 
@@ -31,6 +45,7 @@ contract Forwarder {
 		uint gasPrice,
 		uint256 nonce
 	)
+	    isWhitelisted
 		public
 	{
 		require(

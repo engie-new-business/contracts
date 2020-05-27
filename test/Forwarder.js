@@ -1,6 +1,7 @@
 const ethUtil = require('ethereumjs-util');
 const abi = require('ethereumjs-abi');
 
+const Whitelist = artifacts.require("Whitelist");
 const Forwarder = artifacts.require("Forwarder");
 const RelayableIdentity = artifacts.require("RelayableIdentity");
 
@@ -17,7 +18,8 @@ contract('Forwarder cotract', (accounts) => {
       EOAs[i] = web3.eth.accounts.create();
     }
     relayableIdentityContract = await RelayableIdentity.new(EOAs[0].address, { from: RELAYER });
-    forwarderContract = await Forwarder.new({ from: RELAYER });
+    whitelistContract = await Whitelist.new([RELAYER], { from: RELAYER });
+    forwarderContract = await Forwarder.new(whitelistContract.address, { from: RELAYER });
 
     await web3.eth.sendTransaction({
       from: accounts[0],
