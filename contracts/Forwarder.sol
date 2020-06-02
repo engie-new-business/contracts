@@ -2,23 +2,25 @@ pragma solidity >=0.6.0 <0.7.0;
 
 import "./IRelayer.sol";
 import "./SafeMath.sol";
-import "./Whitelist.sol";
+import "./Relayers.sol";
+import "./OwnersMap.sol";
 
-contract Forwarder {
+contract Forwarder is OwnersMap {
 	using SafeMath for uint256;
-	Whitelist whitelist;
+	Relayers public relayers;
 
-	modifier isWhitelisted {
-		require(whitelist.verify(msg.sender), "Invalid sender");
-		_;
-	}
+    modifier isWhitelisted {
+        require(relayers.verify(msg.sender), "Invalid sender");
+        _;
+    }
 
-	constructor(address whitelistAddress) public {
-		whitelist = Whitelist(whitelistAddress);
-	}
+    constructor(address relayersAddress) public {
+        relayers = Relayers(relayersAddress);
+    }
 
-	function changeWhitelistSource(address whitelistAddress) isWhitelisted public {
-        whitelist = Whitelist(whitelistAddress);
+	function changeRelayersSource(address relayersAddress) public {
+		require(owners[msg.sender], "Sender is not an owner");
+        relayers = Relayers(relayersAddress);
 	}
 
 	receive() external payable { }
