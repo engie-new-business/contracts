@@ -2,22 +2,22 @@ pragma solidity >=0.6.0 <0.7.0;
 pragma experimental ABIEncoderV2;
 
 import "./IIdentity.sol";
+import "./OwnersMap.sol";
 
-contract Identity is IIdentity {
+contract Identity is OwnersMap, IIdentity {
 	mapping(bytes32 => bytes) store;
-	mapping(address => bool) public whitelist;
 
-	event UpdateWhitelist(address account, bool value);
+	event UpdateOwners(address account, bool value);
 
-	modifier onlyWhitelisted() virtual {
-		require(whitelist[msg.sender], "Account Not Whitelisted");
+	modifier onlyOwners() virtual {
+		require(owners[msg.sender], "Account not an owner");
 		_;
 	}
 
 	/// @dev Whitelist the owner.
 	/// @param owner Address of the owner.
 	constructor(address owner) public {
-		whitelist[owner] = true;
+		owners[owner] = true;
 	}
 
 	/// @dev Fallback function for receiving Ether, emit an event.
@@ -25,14 +25,14 @@ contract Identity is IIdentity {
 		emit Received(msg.sender, msg.value);
 	}
 
-	/// @dev Execute a call if the sender is whitelisted.
+	/// @dev Execute a call if the sender is an owner.
 	/// @param to Destination address for the call .
 	/// @param value Ether value for the call.
 	/// @param data Data payload for the call.
 	function execute(address to, uint value, bytes memory data)
 		public
 		override
-		onlyWhitelisted
+		onlyOwners
 	{
 		require(
 			executeCall(gasleft(), to, value, data),
@@ -40,14 +40,14 @@ contract Identity is IIdentity {
 		);
 	}
 
-	/// @dev Execute a deplaoy call if the sender is whitelisted.
+	/// @dev Execute a deplaoy call if the sender is an owner.
 	/// @param value Ether value for the call.
 	/// @param salt Salt used for create2.
 	/// @param initCode Code of the smart contract.
 	function deploy(uint256 value, bytes32 salt, bytes calldata initCode)
 		external
 		override
-		onlyWhitelisted
+		onlyOwners
 		returns (address)
 	{
 		address addr = executeCreate2(value, salt, initCode);
@@ -65,7 +65,7 @@ contract Identity is IIdentity {
 	/// @param calls list of calls to execute
 	function batch(Call[] memory calls)
 		public
-		onlyWhitelisted
+		onlyOwners
 	{
 		for (uint i = 0; i < calls.length; i++) {
 			execute(
@@ -76,13 +76,13 @@ contract Identity is IIdentity {
 		}
 	}
 
-	/// @dev Store some data if the the sender is whitelisted.
+	/// @dev Store some data if the the sender is an owner.
 	/// @param key Key for the data.
 	/// @param value Value to store.
 	function setData(bytes32 key, bytes calldata value)
 		external
 		override
-		onlyWhitelisted
+		onlyOwners
 	{
 		store[key] = value;
 		emit DataChanged(key, value);
@@ -99,16 +99,16 @@ contract Identity is IIdentity {
 		return store[key];
 	}
 
-	/// @dev Add or remove an address from the whitelist
+	/// @dev Add or remove an address from the owners
 	/// @param account Address to change.
 	/// @param value Action to do (true to add and false to remove).
-	function updateWhitelist(address account, bool value)
+	function updateOwners(address account, bool value)
 		public
-		onlyWhitelisted
+		onlyOwners
 		returns(bool)
 	{
-		whitelist[account] = value;
-		emit UpdateWhitelist(account, value);
+		owners[account] = value;
+		emit UpdateOwners(account, value);
 		return true;
 	}
 

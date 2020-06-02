@@ -33,7 +33,7 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
   });
 
   it('EOAs[0] should be whitelisted', async () => {
-    let res = await RelayableIdentityRewarderContract.whitelist(EOAs[0].address)
+    let res = await RelayableIdentityRewarderContract.owners(EOAs[0].address)
     assert.isTrue(res)
   });
 
@@ -58,7 +58,7 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
 
   it('should whitelist EOAs[1]', async () => {
     await addToWhiteList(EOAs[1].address)
-    assert.isTrue(await RelayableIdentityRewarderContract.whitelist(EOAs[1].address))
+    assert.isTrue(await RelayableIdentityRewarderContract.owners(EOAs[1].address))
   });
 
   it('first relay with new whitelisted should pass with 100 000 gas', async () => {
@@ -131,16 +131,16 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
     const signer = EOAs[0]
     const newWL = EOAs[4]
 
-    let whitelisted = await RelayableIdentityRewarderContract.whitelist(signer.address)
+    let whitelisted = await RelayableIdentityRewarderContract.owners(signer.address)
     assert.isTrue(whitelisted)
-    whitelisted = await RelayableIdentityRewarderContract.whitelist(newWL.address)
+    whitelisted = await RelayableIdentityRewarderContract.owners(newWL.address)
     assert.isFalse(whitelisted)
 
     let res = await relayTransaction(
       signer,
       RelayableIdentityRewarderContract.address,
       0,
-      await RelayableIdentityRewarderContract.contract.methods.updateWhitelist(newWL.address, true).encodeABI(),
+      await RelayableIdentityRewarderContract.contract.methods.updateOwners(newWL.address, true).encodeABI(),
       0,
       1,
       MAXGAS,
@@ -148,7 +148,7 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
     )
     assert.isTrue(res.relayed)
 
-    whitelisted = await RelayableIdentityRewarderContract.whitelist(newWL.address)
+    whitelisted = await RelayableIdentityRewarderContract.owners(newWL.address)
     assert.isTrue(whitelisted)
     assert.isAbove(res.paymentGas, res.gasUsed)
   });
@@ -353,7 +353,7 @@ contract('RelayableIdentityRewarder contract', (accounts) => {
 
   async function addToWhiteList(address) {
     let signer = EOAs[0]
-    let data = RelayableIdentityRewarderContract.contract.methods.updateWhitelist(address, true).encodeABI()
+    let data = RelayableIdentityRewarderContract.contract.methods.updateOwners(address, true).encodeABI()
     let res = await signer.signTransaction({
       to: RelayableIdentityRewarderContract.address,
       value: '0',

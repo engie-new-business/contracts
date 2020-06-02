@@ -1,27 +1,27 @@
 pragma solidity >=0.6.0 <0.7.0;
 pragma experimental ABIEncoderV2;
 
-import "./Identity.sol";
-import "./IRelayer.sol";
-import "./SafeMath.sol";
-import "./ERC165/ERC165.sol";
+import "../Identity.sol";
+import "../IRelayer.sol";
+import "../SafeMath.sol";
+import "../ERC165/ERC165.sol";
 
 /// @title On chain identity capable to receive relayed transaction
 /// @author Rockside dev team (tech@rockside.io)
-contract RelayableIdentity is Identity, IRelayer, ERC165 {
+contract RelayableIdentityWihtoutPayement is Identity, ERC165 {
 	using SafeMath for uint256;
 
 	// keccak256("EIP712Domain(address verifyingContract,uint256 chainId)")
 	bytes32 constant EIP712DOMAIN_TYPEHASH =
 		0xa1f4e2f207746c24e01c8e10e467322f5fea4cccab3cd2f1c95d700b6a0c218b;
 
-	// keccak256("TxMessage(address relayer,address signer,address to,uint256 value,bytes data,uint256 gasLimit,uint256 gasPrice,uint256 nonce)")
+	// keccak256("TxMessage(address relayer,address signer,address to,uint256 value,bytes data,uint256 nonce)")
 	bytes32 constant TXMESSAGE_TYPEHASH =
-		0x15e5164c7289182ea8d9e79b7bc906f477badac5a4d638eca1df27e541f2e0d5;
+		0x59595364b96b35e3749eebfe67b9c61949071063826bc26621675fe7b4fa3927;
 
-	// keccak256("Create2Message(address relayer,address signer,uint256 value,uint256 salt,bytes initCode,uint256 gasLimit,uint256 gasPrice,uint256 nonce)")
+	// keccak256("Create2Message(address relayer,address signer,uint256 value,uint256 salt,bytes initCode,uint256 nonce)")
 	bytes32 constant CREATE2MESSAGE_TYPEHASH =
-		0x20d0097fbce7658ac12affd89e4e72962a735274d25c7f4549faa445ea440e0c;
+		0xfe3db1070f9278d020d75b38708e5c0487d150c83b3e97f348b6a0b4ee672827;
 
 	bytes32 DOMAIN_SEPARATOR;
 
@@ -32,6 +32,7 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 	uint constant REQUIRE_GAS_LEFT_AFTER_EXEC = 15000;
 
 	mapping(address => mapping(uint128 => uint128)) public channels;
+	/* bool initialised; */
 
 	event RelayedExecute (bool success, uint256 payment);
 	event RelayedDeploy (address contractAddress, uint256 payment);
@@ -60,8 +61,6 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 	/// @param to Destination address of internal transaction .
 	/// @param value Ether value of internal transaction.
 	/// @param data Data payload of internal transaction.
-	/// @param gasLimit Execution gas limit that the signer agreed to pay.
-	/// @param gasPrice Gas price limit that the signer agreed to pay.
 	/// @param nonce Nonce of the internal transaction.
 	function relayExecute(
 		bytes memory signature,
@@ -70,23 +69,16 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 		address to ,
 		uint value,
 		bytes memory data,
-		uint gasLimit,
-		uint gasPrice,
 		uint256 nonce
 	)
 		public
-		override
 	{
-		uint _initialGas = gasleft();
-
 		bytes32 _hash = hashTxMessage(
 			relayer,
 			signer,
 			to,
 			value,
 			data,
-			gasLimit,
-			gasPrice,
 			nonce
 		);
 
@@ -96,7 +88,7 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 		);
 		require(checkAndUpdateNonce(signer, nonce), "Nonce is invalid");
 		require(
-			relayer == tx.origin || relayer == address(0),
+			relayer == msg.sender || relayer != address(0),
 			"Invalid relayer"
 		);
 
@@ -112,23 +104,7 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 			data
 		);
 
-		if(gasPrice == 0) {
-			emit RelayedExecute(success, 0);
-			return;
-		}
-
-		// _txSendCost = 21000 (transaction) + 68/4 (we assume that the quarter of data bytes are non zero) * msg.data.length
-		uint256 _txSendCost = msg.data.length.mul(17).add(21000);
-		uint256 gasUsed = _initialGas.sub(gasleft())
-			.add(_txSendCost)
-			.add(REQUIRE_GAS_LEFT_AFTER_EXEC);
-		require(
-			gasUsed <= gasLimit || gasLimit == 0 || gasPrice == 0,
-			"Execution cost exceeded agreed gasLimit"
-		);
-
-		uint256 payment = handlePayment(gasUsed, gasPrice);
-		emit RelayedExecute(success, payment);
+		emit RelayedExecute(success, 0);
 	}
 
 	/// @dev Relay a deploy transaction and then pays the relayer.
@@ -137,8 +113,6 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 	/// @param value Ether value of internal transaction.
 	/// @param salt Salt used for create2.
 	/// @param initCode Code of the smart contract.
-	/// @param gasLimit Execution gas limit that the signer agreed to pay.
-	/// @param gasPrice Gas price limit that the signer agreed to pay.
 	/// @param nonce Nonce of the internal transaction.
 	function relayDeploy(
 		bytes memory signature,
@@ -147,23 +121,16 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 		uint256 value,
 		bytes32 salt,
 		bytes memory initCode,
-		uint gasLimit,
-		uint gasPrice,
 		uint256 nonce
 	)
 		public
-		override
 	{
-		uint _initialGas = gasleft();
-
 		bytes32 _hash = hashCreateMessage(
 			relayer,
 			signer,
 			value,
 			salt,
 			initCode,
-			gasLimit,
-			gasPrice,
 			nonce
 		);
 
@@ -179,23 +146,7 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 
 		address addr = executeCreate2(value, salt, initCode);
 
-		if(gasPrice == 0) {
-			emit RelayedDeploy(addr, 0);
-			return;
-		}
-
-		// _txSendCost = 21000 (transaction) + 68 (we assume that all data bytes are non zero) * msg.data.length
-		uint256 _txSendCost = msg.data.length.mul(68).add(21000);
-		uint256 gasUsed = _initialGas.sub(gasleft())
-			.add(_txSendCost)
-			.add(REQUIRE_GAS_LEFT_AFTER_EXEC);
-		require(
-			gasUsed <= gasLimit || gasLimit == 0,
-			"Execution cost exceeded agreed gasLimit"
-		);
-
-		uint256 payment = handlePayment(gasUsed, gasPrice);
-		emit RelayedDeploy(addr, payment);
+		emit RelayedDeploy(addr, 0);
 	}
 
 	/// @dev Message to sign expected for relay transaction.
@@ -203,8 +154,6 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 	/// @param to Destination address of internal transaction.
 	/// @param value Ether value of internal transaction.
 	/// @param data Data payload of internal transaction.
-	/// @param gasLimit Execution gas limit that the signer agreed to pay.
-	/// @param gasPrice Gas price limit that the signer agreed to pay.
 	/// @param nonce Nonce of the internal transaction.
 	function hashTxMessage(
 		address relayer,
@@ -212,8 +161,6 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 		address to,
 		uint value,
 		bytes memory data,
-		uint256 gasLimit,
-		uint256 gasPrice,
 		uint256 nonce
 	)
 		public
@@ -227,8 +174,6 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 			to,
 			value,
 			keccak256(bytes(data)),
-			gasLimit,
-			gasPrice,
 			nonce
 		));
 	}
@@ -238,8 +183,6 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 	/// @param value Ether value of internal transaction.
 	/// @param salt Salt used for create2.
 	/// @param initCode Code of the smart contract.
-	/// @param gasLimit Execution gas limit that the signer agreed to pay.
-	/// @param gasPrice Gas price limit that the signer agreed to pay.
 	/// @param nonce Nonce of the internal transaction.
 	function hashCreateMessage(
 		address relayer,
@@ -247,8 +190,6 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 		uint256 value,
 		bytes32 salt,
 		bytes memory initCode,
-		uint256 gasLimit,
-		uint256 gasPrice,
 		uint256 nonce
 	)
 		public
@@ -262,8 +203,6 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 			value,
 			salt,
 			keccak256(bytes(initCode)),
-			gasLimit,
-			gasPrice,
 			nonce
 		));
 	}
@@ -284,23 +223,6 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 			return true;
 		}
 		return false;
-	}
-
-	/// @dev Calculate and send refund for the relayer.
-	/// @param consumed Gas consumed by the execution.
-	/// @param gasPrice Gas price limit that the signer agreed to pay.
-	function handlePayment(
-		uint256 consumed,
-		uint256 gasPrice
-	)
-		internal
-		returns (uint256)
-	{
-		uint256 payment = consumed.mul(tx.gasprice < gasPrice ? tx.gasprice : gasPrice);
-
-		require(msg.sender.send(payment), "Could not pay gas costs with ether");
-
-		return payment;
 	}
 
 	/// @dev Find the signer of signature and check if he is an owner.

@@ -1,6 +1,6 @@
 pragma solidity >=0.6.0 <0.7.0;
 
-contract Whitelist {
+contract Relayers {
 	mapping(address => bool) public whitelist;
 
 	constructor(address[] memory senders) public {
