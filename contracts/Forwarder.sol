@@ -8,6 +8,7 @@ import "./OwnersMap.sol";
 contract Forwarder is OwnersMap {
 	using SafeMath for uint256;
 	Relayers public relayers;
+	bool initialized;
 
     modifier isWhitelisted {
         require(relayers.verify(msg.sender), "Invalid sender");
@@ -15,8 +16,14 @@ contract Forwarder is OwnersMap {
     }
 
     constructor(address relayersAddress) public {
-        relayers = Relayers(relayersAddress);
+        initialize(relayersAddress);
     }
+
+	function initialize(address relayersAddress) public {
+		require(!initialized, "Contract already initialized");
+		initialized = true;
+		relayers = Relayers(relayersAddress);
+	}
 
 	function changeRelayersSource(address relayersAddress) public {
 		require(owners[msg.sender], "Sender is not an owner");

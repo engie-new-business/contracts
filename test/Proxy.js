@@ -3,6 +3,7 @@ const abi = require('ethereumjs-abi');
 
 const RelayableIdentity = artifacts.require("RelayableIdentity");
 const Proxy = artifacts.require("Proxy");
+const ProxyFactory = artifacts.require("ProxyFactory");
 const RelayableIdentityWihtoutPayement = artifacts.require("RelayableIdentityWihtoutPayement");
 const Forwarder = artifacts.require("Forwarder");
 const Relayers = artifacts.require("Relayers");
@@ -14,6 +15,7 @@ contract('Proxy', (accounts) => {
   let relayableIdentityContract;
   let relayableIdentityWihtoutPayementContract;
   let forwarderContract;
+  let proxyFactoryContract;
   let proxy;
 
   before(async () => {
@@ -24,13 +26,13 @@ contract('Proxy', (accounts) => {
     relayableIdentityWihtoutPayementContract = await RelayableIdentityWihtoutPayement.new(EOAs[0].address, { from: RELAYER });
     relayerContract = await Relayers.new([RELAYER], { from: RELAYER });
     forwarderContract = await Forwarder.new(relayerContract.address, { from: RELAYER });
+    proxyFactoryContract = await ProxyFactory.new({ from: RELAYER })
   });
 
   describe('RelayableIdentity', async () => {
     before(async () => {
-      proxy = await Proxy.new(EOAs[1].address, "v0", relayableIdentityContract.address, { from: RELAYER });
-      proxy.identity = await RelayableIdentity.at(proxy.address)
-      await proxy.identity.initialise()
+      proxy = await deployProxy(EOAs[1].address, "v0", relayableIdentityContract.address, relayableIdentityContract.contract.methods.initialise().encodeABI())
+      proxy.identity = await RelayableIdentity.at(proxy.address);
 
       await web3.eth.sendTransaction({
         from: accounts[0],
@@ -129,18 +131,8 @@ contract('Proxy', (accounts) => {
 
   describe('Forwarder', async () => {
     before(async () => {
-      proxy = await Proxy.new(EOAs[1].address, "v0", forwarderContract.address, { from: RELAYER });
+      proxy = await deployProxy(EOAs[1].address, "v0", forwarderContract.address, forwarderContract.contract.methods.initialize(relayerContract.address).encodeABI(), { from: RELAYER });
       proxy.forwarder = await Forwarder.at(proxy.address)
-
-      let data = proxy.forwarder.contract.methods.changeRelayersSource(relayerContract.address).encodeABI()
-      let tx = await EOAs[1].signTransaction({
-        to: proxy.forwarder.address,
-        value: '0',
-        gas: 200000,
-        gasPrice: 0,
-        data: data
-      })
-      await web3.eth.sendSignedTransaction(tx.rawTransaction)
 
       await web3.eth.sendTransaction({
         from: accounts[0],
@@ -207,6 +199,17 @@ contract('Proxy', (accounts) => {
 
     const nonceValue = BigInt(channelNonce) + (BigInt(channel) * (2n ** 128n));
     return '0x' + nonceValue.toString(16)
+  }
+
+  const deployProxy = async (owner, version, implementation, data) => {
+    const res = await proxyFactoryContract.createProxyWithNonce(owner, version, implementation, data, getRandomNonce(), { from: RELAYER });
+    let address
+    for (var i = 0; i < res.logs.length; i++) {
+      if (res.logs[i].event == 'ProxyCreation') {
+        address = res.logs[i].args.proxy
+      }
+    }
+    return await Proxy.at(address)
   }
 });
 
@@ -282,4 +285,10 @@ function encodeData(primaryType, data) {
 
 function structHash(primaryType, data) {
     return ethUtil.keccak256(encodeData(primaryType, data));
+}
+
+function getRandomNonce() {
+  const channel = Math.ceil(Math.random() * 1000000);
+  const nonce = BigInt(channel) * 2n**218n;
+  return '0x' + nonce.toString(16);
 }
