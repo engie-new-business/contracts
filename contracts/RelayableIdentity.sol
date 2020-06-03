@@ -52,6 +52,10 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 		_registerInterface(_INTERFACE_ID_RELAYER);
 	}
 
+	function getNonce(address signer, uint128 channel) override external view returns (uint128) {
+		return channels[signer][channel];
+	}
+
 	/// @dev Relay a transaction and then pays the relayer.
 	/// @param signature Signature by the signer of the other params.
 	/// @param signer Signer of the signature.
@@ -167,7 +171,7 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 		);
 		require(checkAndUpdateNonce(signer, nonce), "Nonce is invalid");
 		require(
-			relayer == msg.sender || relayer != address(0),
+			relayer == tx.origin || relayer == address(0),
 			"Invalid relayer"
 		);
 

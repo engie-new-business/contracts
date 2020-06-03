@@ -8,14 +8,14 @@ contract Forwarder {
 	using SafeMath for uint256;
 	Whitelist whitelist;
 
-    modifier isWhitelisted {
-        require(whitelist.verify(msg.sender), "Invalid sender");
-        _;
-    }
+	modifier isWhitelisted {
+		require(whitelist.verify(msg.sender), "Invalid sender");
+		_;
+	}
 
-    constructor(address whitelistAddress) public {
-        whitelist = Whitelist(whitelistAddress);
-    }
+	constructor(address whitelistAddress) public {
+		whitelist = Whitelist(whitelistAddress);
+	}
 
 	function changeWhitelistSource(address whitelistAddress) isWhitelisted public {
         whitelist = Whitelist(whitelistAddress);

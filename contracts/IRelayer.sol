@@ -4,6 +4,29 @@ interface IRelayer {
 	event RelayedExecute (bool success, uint256 payment);
 	event RelayedDeploy (address contractAddress, uint256 payment);
 
-	function relayExecute(bytes calldata signature, address relayer, address signer, address to , uint value, bytes calldata data, uint gasLimit, uint gasPrice, uint256 nonce) external;
-	function relayDeploy(bytes calldata signature, address relayer, address signer, uint256 value, bytes32 salt, bytes calldata initCode, uint gasLimit, uint gasPrice, uint256 nonce) external;
+	function relayExecute(
+		bytes calldata signature,
+		address relayer,
+		address signer,
+		address to ,
+		uint value,
+		bytes calldata data,
+		uint gasLimit,
+		uint gasPrice,
+		uint256 nonce
+	) external;
+
+	function relayDeploy(
+		bytes calldata signature,
+		address relayer,
+		address signer,
+		uint256 value,
+		bytes32 salt,
+		bytes calldata initCode,
+		uint gasLimit,
+		uint gasPrice,
+		uint256 nonce
+	) external;
+
+	function getNonce(address signer, uint128 channel) external view returns (uint128);
 }
