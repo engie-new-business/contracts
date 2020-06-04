@@ -6,7 +6,7 @@ contract Proxy is OwnersMap {
     string public version;
     address public implementation;
 
-    event Upgraded(string version, address indexed implementation);
+    event Upgraded(string version, address implementation);
 
     constructor(address owner, string memory _version, address _implementation) public {
         owners[owner] = true;
