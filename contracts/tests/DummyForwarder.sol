@@ -1,11 +1,11 @@
 pragma solidity >=0.6.0 <0.7.0;
 
-import "./IRelayer.sol";
-import "./SafeMath.sol";
-import "./Relayers.sol";
-import "./OwnersMap.sol";
+import "../IRelayer.sol";
+import "../SafeMath.sol";
+import "../Relayers.sol";
+import "../OwnersMap.sol";
 
-contract Forwarder is OwnersMap {
+contract DummyForwarder is OwnersMap {
 	using SafeMath for uint256;
 	Relayers public relayers;
 	mapping(address => bool) public trustedContracts;
@@ -42,6 +42,10 @@ contract Forwarder is OwnersMap {
 	}
 
 	receive() external payable { }
+
+	function dummyFunction() public pure returns (string memory) {
+		return "dummy";
+	}
 
 	/// @dev Forwards a meta transaction to a relayer contract.
 	/// @param relayerContract Address of the relayer contract that must relay the transaction

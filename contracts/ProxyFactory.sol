@@ -36,6 +36,6 @@ contract ProxyFactory {
             require(success, "Failing call after deployment");
         }
 
-	emit ProxyCreation(proxy);
+        emit ProxyCreation(proxy);
     }
 }

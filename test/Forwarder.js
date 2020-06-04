@@ -19,7 +19,7 @@ contract('Forwarder cotract', (accounts) => {
     }
     relayableIdentityContract = await RelayableIdentity.new(EOAs[0].address, { from: RELAYER });
     relayerContract = await Relayers.new([RELAYER], { from: RELAYER });
-    forwarderContract = await Forwarder.new(relayerContract.address, { from: RELAYER });
+    forwarderContract = await Forwarder.new(relayerContract.address, [relayableIdentityContract.address], { from: RELAYER });
 
     await web3.eth.sendTransaction({
       from: accounts[0],
@@ -56,6 +56,36 @@ contract('Forwarder cotract', (accounts) => {
       metatx.nonce,
       { from: RELAYER }
     );
+  });
+
+  it('should not allow invalid destination', async () => {
+    const signer = EOAs[0];
+    const metatx = {
+      destination: '0x0000000000000000000000000000000000000000',
+      value: 0,
+      data: '0x',
+      gasLimit: 0,
+      gasPrice: 1,
+      nonce: await getNonceForChannel(signer.address, 0),
+    };
+
+    const signature = await signMetaTx({
+      ...metatx,
+      signer,
+      relayer: RELAYER,
+    });
+
+    try {
+      const res = await forwarderContract.forward(
+        "0x0000000000000000000000000000000000000000", signature, RELAYER, signer.address,
+        metatx.destination, metatx.value, metatx.data, metatx.gasLimit, metatx.gasPrice,
+        metatx.nonce,
+        { from: RELAYER }
+      );
+      assert.isTrue(false);
+    } catch (e) {
+      assert.equal('Unauthorized destination', e.reason);
+    }
   });
 
   const signMetaTx = async ({ signer, relayer, destination, value, data, gasLimit, gasPrice, nonce }) => {
