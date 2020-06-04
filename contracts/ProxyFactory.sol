@@ -18,11 +18,11 @@ contract ProxyFactory {
         emit ProxyCreation(proxy);
     }
 
-    function createProxyWithNonce(address owner, string memory version, address implementation, bytes memory data, uint256 saltNonce)
+    function createProxyWithNonce(address owner, string memory version, address implementation, bytes memory data, bytes32 saltNonce)
         public
         returns (Proxy proxy)
     {
-        bytes32 salt = keccak256(abi.encodePacked(keccak256(data), saltNonce));
+        bytes32 salt = keccak256(abi.encode(keccak256(data), saltNonce));
         bytes memory deploymentData = abi.encodePacked(type(Proxy).creationCode, abi.encode(owner, version, implementation));
 
         // solium-disable-next-line security/no-inline-assembly
@@ -36,6 +36,6 @@ contract ProxyFactory {
             require(success, "Failing call after deployment");
         }
 
-        emit ProxyCreation(proxy);
+	emit ProxyCreation(proxy);
     }
 }

@@ -40,10 +40,10 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 	/// @param owner Address of the owner.
 	constructor(address owner) Identity(owner) public {
 		owners[address(this)] = true;
-		initialise();
+		initialize();
 	}
 
-	function initialise() public {
+	function initialize() public {
 		uint256 id;
 		// solhint-disable-next-line no-inline-assembly
 		assembly {
