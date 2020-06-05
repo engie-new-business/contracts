@@ -25,7 +25,7 @@ contract Proxy is OwnersMap {
 
     function upgradeToAndCall(string memory newVersion, address newImplementation, bytes memory data) payable public {
         upgradeTo(newVersion, newImplementation);
-        (bool success,) = address(this).call.value(msg.value)(data);
+        (bool success,) = address(this).call{value:msg.value}(data);
         require(success, "Failing call after upgrade");
     }
 

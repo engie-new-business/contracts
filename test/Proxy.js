@@ -38,7 +38,7 @@ contract('Proxy', (accounts) => {
     let proxy;
     let identity;
     before(async () => {
-      proxy = await deployProxy(EOAs[1].address, "v0", relayableIdentityContract.address, relayableIdentityContract.contract.methods.initialise().encodeABI())
+      proxy = await deployProxy(EOAs[1].address, "v0", relayableIdentityContract.address, relayableIdentityContract.contract.methods.initialize().encodeABI())
       identity = await RelayableIdentity.at(proxy.address);
 
       await web3.eth.sendTransaction({

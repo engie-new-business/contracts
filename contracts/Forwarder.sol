@@ -9,6 +9,7 @@ contract Forwarder is OwnersMap {
 	using SafeMath for uint256;
 	Relayers public relayers;
 	mapping(address => bool) public trustedContracts;
+	bool internal hasTrustedContracts;
 	bool public initialized;
 
     modifier isWhitelisted {
@@ -24,6 +25,7 @@ contract Forwarder is OwnersMap {
 		require(!initialized, "Contract already initialized");
 		initialized = true;
 		relayers = Relayers(relayersAddress);
+		hasTrustedContracts = contracts.length > 0;
 		for(uint256 i = 0; i < contracts.length; i++) {
 			trustedContracts[contracts[i]] = true;
 		}
@@ -31,6 +33,7 @@ contract Forwarder is OwnersMap {
 
 	function updateTrustedContracts(address[] memory contracts) public {
 		require(owners[msg.sender], "Sender is not an owner");
+		hasTrustedContracts = true;
 		for(uint256 i = 0; i < contracts.length; i++) {
 			trustedContracts[contracts[i]] = !trustedContracts[contracts[i]];
 		}
@@ -72,7 +75,10 @@ contract Forwarder is OwnersMap {
 			relayer == msg.sender || relayer == address(0),
 			"Invalid relayer"
 		);
-		require(trustedContracts[address(relayerContract)], "Unauthorized destination");
+		require(
+			!hasTrustedContracts || trustedContracts[address(relayerContract)],
+			"Unauthorized destination"
+		);
 
 		uint256 startGas = gasleft();
 
