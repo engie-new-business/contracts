@@ -5,7 +5,7 @@ contract ProxyFactory {
 
     event ProxyCreation(Proxy proxy);
 
-    function createProxy(address owner, string memory version, address implementation, bytes memory data)
+    function createProxy(address owner, bytes32 version, address implementation, bytes memory data)
         public
         returns (Proxy proxy)
     {
@@ -18,7 +18,7 @@ contract ProxyFactory {
         emit ProxyCreation(proxy);
     }
 
-    function createProxyWithNonce(address owner, string memory version, address implementation, bytes memory data, bytes32 saltNonce)
+    function createProxyWithNonce(address owner, bytes32 version, address implementation, bytes memory data, bytes32 saltNonce)
         public
         returns (Proxy proxy)
     {

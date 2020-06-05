@@ -38,7 +38,7 @@ contract('Proxy', (accounts) => {
     let proxy;
     let identity;
     before(async () => {
-      proxy = await deployProxy(EOAs[1].address, "v0", relayableIdentityContract.address, relayableIdentityContract.contract.methods.initialize().encodeABI())
+      proxy = await deployProxy(EOAs[1].address, web3.utils.utf8ToHex("v0"), relayableIdentityContract.address, relayableIdentityContract.contract.methods.initialize().encodeABI())
       identity = await RelayableIdentity.at(proxy.address);
 
       await web3.eth.sendTransaction({
@@ -87,7 +87,7 @@ contract('Proxy', (accounts) => {
       const metatx = {
         destination: proxy.address,
         value: 0,
-        data: proxy.contract.methods.upgradeTo("v2", relayableIdentityWihtoutPayementContract.address).encodeABI(),
+        data: proxy.contract.methods.upgradeTo(web3.utils.utf8ToHex("v2"), relayableIdentityWihtoutPayementContract.address).encodeABI(),
         gasLimit: 0,
         gasPrice: 1,
         nonce: await getNonceForChannel(identity, signer.address, 0),
@@ -143,7 +143,7 @@ contract('Proxy', (accounts) => {
     let forwarder;
 
     before(async () => {
-      proxy = await deployProxy(EOAs[1].address, "v0", forwarderContract.address, forwarderContract.contract.methods.initialize(relayerContract.address, [relayableIdentityContract.address]).encodeABI(), { from: RELAYER });
+      proxy = await deployProxy(EOAs[1].address, web3.utils.utf8ToHex("v0"), forwarderContract.address, forwarderContract.contract.methods.initialize(relayerContract.address, [relayableIdentityContract.address]).encodeABI(), { from: RELAYER });
       forwarder = await Forwarder.at(proxy.address)
 
       await web3.eth.sendTransaction({
@@ -156,6 +156,11 @@ contract('Proxy', (accounts) => {
         to: proxy.address,
         value: web3.utils.toWei('1', 'ether'),
       });
+    });
+
+    it('should have a version and implementation', async () => {
+      assert.equal(web3.utils.hexToUtf8(await proxy.version()), "v0")
+      assert.equal(await proxy.implementation(), forwarderContract.address)
     });
 
     it('should forward a meta tx to an identity', async () => {
@@ -191,7 +196,7 @@ contract('Proxy', (accounts) => {
         value: '0',
         gas: 300000,
         gasPrice: 0,
-        data: await proxy.contract.methods.upgradeTo("v2", dummyForwarderContract.address).encodeABI(),
+        data: await proxy.contract.methods.upgradeTo(web3.utils.utf8ToHex("v2"), dummyForwarderContract.address).encodeABI(),
       })
 
       try {
