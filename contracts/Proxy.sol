@@ -19,7 +19,7 @@ contract Proxy is OwnersMap {
 
     event Upgraded(bytes32 version, address implementation);
 
-    constructor(address owner, bytes32 version, address implementation) public {
+    constructor(address owner, bytes32 version, address implementation) payable public {
         owners[owner] = true;
         owners[address(this)] = true;
         _setVersion(version);

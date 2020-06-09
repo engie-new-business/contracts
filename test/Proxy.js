@@ -34,6 +34,38 @@ contract('Proxy', (accounts) => {
     proxyFactoryContract = await ProxyFactory.new({ from: RELAYER })
   });
 
+  describe('ProxyFactory', async () => {
+    it('should have transfert the value to the proxy at creation with nonce', async () => {
+      const res = await proxyFactoryContract.createProxyWithNonce(
+        RELAYER, web3.utils.utf8ToHex("v0"), "0x0000000000000000000000000000000000000000", "0x", getRandomNonce(),
+        { from: RELAYER, value: 1 }
+      );
+      let address
+      for (var i = 0; i < res.logs.length; i++) {
+        if (res.logs[i].event == 'ProxyCreation') {
+          address = res.logs[i].args.proxy
+        }
+      }
+
+      assert.equal(await web3.eth.getBalance(address), 1)
+    });
+
+    it('should have transfert the value to the proxy at creation', async () => {
+      const res = await proxyFactoryContract.createProxy(
+        RELAYER, web3.utils.utf8ToHex("v0"), "0x0000000000000000000000000000000000000000", "0x",
+        { from: RELAYER, value: 1 }
+      );
+      let address
+      for (var i = 0; i < res.logs.length; i++) {
+        if (res.logs[i].event == 'ProxyCreation') {
+          address = res.logs[i].args.proxy
+        }
+      }
+
+      assert.equal(await web3.eth.getBalance(address), 1)
+    });
+  });
+
   describe('RelayableIdentity', async () => {
     let proxy;
     let identity;
