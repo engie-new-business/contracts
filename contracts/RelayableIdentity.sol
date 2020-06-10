@@ -36,7 +36,7 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 	event RelayedExecute (bool success, uint256 payment);
 	event RelayedDeploy (address contractAddress, uint256 payment);
 
-    /// @dev Initializes the contract and whitelist the owner and itself.
+	/// @dev Initializes the contract and whitelist the owner and itself.
 	/// @param owner Address of the owner.
 	constructor(address owner) Identity(owner) public {
 		owners[address(this)] = true;
@@ -54,7 +54,7 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 		_registerInterface(_INTERFACE_ID_RELAYER);
 	}
 
-	function getNonce(address signer, uint128 channel) override external view returns (uint128) {
+	function getNonce(address signer, uint128 channel) external view returns (uint128) {
 		return channels[signer][channel];
 	}
 
@@ -78,8 +78,8 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 		uint gasPrice,
 		uint256 nonce
 	)
-		public
-		override
+	public
+	override
 	{
 		uint _initialGas = gasleft();
 
@@ -124,8 +124,8 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 		// _txSendCost = 21000 (transaction) + 68/4 (we assume that the quarter of data bytes are non zero) * msg.data.length
 		uint256 _txSendCost = msg.data.length.mul(17).add(21000);
 		uint256 gasUsed = _initialGas.sub(gasleft())
-			.add(_txSendCost)
-			.add(REQUIRE_GAS_LEFT_AFTER_EXEC);
+		.add(_txSendCost)
+		.add(REQUIRE_GAS_LEFT_AFTER_EXEC);
 		require(
 			gasUsed <= gasLimit || gasLimit == 0 || gasPrice == 0,
 			"Execution cost exceeded agreed gasLimit"
@@ -155,8 +155,7 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 		uint gasPrice,
 		uint256 nonce
 	)
-		public
-		override
+	public
 	{
 		uint _initialGas = gasleft();
 
@@ -191,8 +190,8 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 		// _txSendCost = 21000 (transaction) + 68 (we assume that all data bytes are non zero) * msg.data.length
 		uint256 _txSendCost = msg.data.length.mul(68).add(21000);
 		uint256 gasUsed = _initialGas.sub(gasleft())
-			.add(_txSendCost)
-			.add(REQUIRE_GAS_LEFT_AFTER_EXEC);
+		.add(_txSendCost)
+		.add(REQUIRE_GAS_LEFT_AFTER_EXEC);
 		require(
 			gasUsed <= gasLimit || gasLimit == 0,
 			"Execution cost exceeded agreed gasLimit"
@@ -220,9 +219,9 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 		uint256 gasPrice,
 		uint256 nonce
 	)
-		public
-		pure
-		returns (bytes32)
+	public
+	pure
+	returns (bytes32)
 	{
 		return keccak256(abi.encode(
 			TXMESSAGE_TYPEHASH,
@@ -255,9 +254,9 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 		uint256 gasPrice,
 		uint256 nonce
 	)
-		public
-		pure
-		returns (bytes32)
+	public
+	pure
+	returns (bytes32)
 	{
 		return keccak256(abi.encode(
 			CREATE2MESSAGE_TYPEHASH,
@@ -276,8 +275,8 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 	/// @param signer Signer of the signature.
 	/// @param nonce Nonce of the internal transaction.
 	function checkAndUpdateNonce(address signer, uint256 nonce)
-		internal
-		returns (bool)
+	internal
+	returns (bool)
 	{
 		uint128 _channelId = uint128(nonce / 2**128);
 		uint128 _channelNonce = uint128(nonce % 2**128);
@@ -297,8 +296,8 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 		uint256 consumed,
 		uint256 gasPrice
 	)
-		internal
-		returns (uint256)
+	internal
+	returns (uint256)
 	{
 		uint256 payment = consumed.mul(tx.gasprice < gasPrice ? tx.gasprice : gasPrice);
 
@@ -311,9 +310,9 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 	/// @param message Message without signature.
 	/// @param signature Signature to verify.
 	function signerIsOwner(bytes32 message, bytes memory signature)
-		internal
-		view
-		returns (bool)
+	internal
+	view
+	returns (bool)
 	{
 		bytes32 r;
 		bytes32 s;
@@ -353,9 +352,9 @@ contract RelayableIdentity is Identity, IRelayer, ERC165 {
 	/// @param _verifyingContract Contract address.
 	/// @param _chainId Blockchain chain id.
 	function hashEIP712Domain(address _verifyingContract, uint256 _chainId)
-		internal
-		pure
-		returns (bytes32)
+	internal
+	pure
+	returns (bytes32)
 	{
 		return keccak256(abi.encode(
 			EIP712DOMAIN_TYPEHASH,

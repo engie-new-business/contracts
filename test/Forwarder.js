@@ -3,13 +3,13 @@ const abi = require('ethereumjs-abi');
 
 const Relayers = artifacts.require("Relayers");
 const Forwarder = artifacts.require("Forwarder");
-const RelayableIdentity = artifacts.require("RelayableIdentity");
+const ForwarderIdentity = artifacts.require("ForwarderIdentity");
 
-contract('Forwarder cotract', (accounts) => {
+contract('Forwarder contract', (accounts) => {
   const RELAYER = accounts[0];
 
   let EOAs = []
-  let relayableIdentityContract;
+  let forwarderIdentityContract;
   let forwarderContract;
 
 
@@ -17,13 +17,13 @@ contract('Forwarder cotract', (accounts) => {
     for (var i = 0; i < 5; i++) {
       EOAs[i] = web3.eth.accounts.create();
     }
-    relayableIdentityContract = await RelayableIdentity.new(EOAs[0].address, { from: RELAYER });
     relayerContract = await Relayers.new([RELAYER], { from: RELAYER });
-    forwarderContract = await Forwarder.new(relayerContract.address, [relayableIdentityContract.address], { from: RELAYER });
+    forwarderContract = await Forwarder.new(relayerContract.address, [], { from: RELAYER });
+    forwarderIdentityContract = await ForwarderIdentity.new(EOAs[0].address, forwarderContract.address, { from: RELAYER });
 
     await web3.eth.sendTransaction({
       from: accounts[0],
-      to: relayableIdentityContract.address,
+      to: forwarderIdentityContract.address,
       value: web3.utils.toWei('1', 'ether'),
     });
     await web3.eth.sendTransaction({
@@ -51,7 +51,7 @@ contract('Forwarder cotract', (accounts) => {
     });
 
     const res = await forwarderContract.forward(
-      relayableIdentityContract.address, signature, RELAYER, signer.address,
+      forwarderIdentityContract.address, signature, RELAYER, signer.address,
       metatx.destination, metatx.value, metatx.data, metatx.gasLimit, metatx.gasPrice,
       metatx.nonce,
       { from: RELAYER }
@@ -59,6 +59,7 @@ contract('Forwarder cotract', (accounts) => {
   });
 
   it('should not allow invalid destination', async () => {
+    const forwarderContract = await Forwarder.new(relayerContract.address, ['0x0000000000000000000000000000000000000001'], { from: RELAYER });
     const signer = EOAs[0];
     const metatx = {
       destination: '0x0000000000000000000000000000000000000000',
@@ -89,14 +90,14 @@ contract('Forwarder cotract', (accounts) => {
   });
 
   const signMetaTx = async ({ signer, relayer, destination, value, data, gasLimit, gasPrice, nonce }) => {
-    const hash = await relayableIdentityContract.hashTxMessage(
+    const hash = await forwarderContract.hashTxMessage(
       relayer, signer.address, destination, value, data, gasLimit, gasPrice, nonce
     );
 
     const chainID = await web3.eth.net.getId();
     const domain = {
       chainId: chainID,
-      verifyingContract: relayableIdentityContract.address,
+      verifyingContract: forwarderIdentityContract.address,
     };
 
     const hashBuf = new Buffer(hash.substring(2), 'hex');
@@ -116,7 +117,7 @@ contract('Forwarder cotract', (accounts) => {
   }
 
   const getNonceForChannel = async (signer, channel) => {
-    const channelNonce = await relayableIdentityContract.channels(signer, channel)
+    const channelNonce = await forwarderContract.channels(signer, channel)
 
     const nonceValue = BigInt(channelNonce) + (BigInt(channel) * (2n ** 128n));
     return '0x' + nonceValue.toString(16)
