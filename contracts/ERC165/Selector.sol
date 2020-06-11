@@ -13,6 +13,6 @@ contract Selector {
     // 0x89dae43a
     function getRelayerEIP165ID() external pure returns (bytes4) {
         IRelayer i;
-        return  i.relayExecute.selector ^ i.relayDeploy.selector;
+        return  i.relayExecute.selector;
     }
 }
