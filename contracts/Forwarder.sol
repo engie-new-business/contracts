@@ -16,13 +16,9 @@ contract Forwarder is OwnersMap {
 	bytes32 constant EIP712DOMAIN_TYPEHASH =
 		0xa1f4e2f207746c24e01c8e10e467322f5fea4cccab3cd2f1c95d700b6a0c218b;
 
-	// keccak256("TxMessage(address relayer,address signer,address to,uint256 value,bytes data,uint256 gasLimit,uint256 gasPrice,uint256 nonce)")
+	// keccak256("TxMessage(address signer,address to,uint256 value,bytes data,uint256 nonce)")
 	bytes32 constant TXMESSAGE_TYPEHASH =
-		0x15e5164c7289182ea8d9e79b7bc906f477badac5a4d638eca1df27e541f2e0d5;
-
-	// keccak256("Create2Message(address relayer,address signer,uint256 value,uint256 salt,bytes initCode,uint256 gasLimit,uint256 gasPrice,uint256 nonce)")
-	bytes32 constant CREATE2MESSAGE_TYPEHASH =
-		0x20d0097fbce7658ac12affd89e4e72962a735274d25c7f4549faa445ea440e0c;
+		0xd3a5dbc47f098f34f663b1d3b74bd4df78ba7e6428e04914120023dfcd11b99b;
 
 	mapping(address => mapping(uint128 => uint128)) public channels;
 
@@ -72,28 +68,21 @@ contract Forwarder is OwnersMap {
 	/// @param to Destination address of internal transaction .
 	/// @param value Ether value of internal transaction.
 	/// @param data Data payload of internal transaction.
-	/// @param gasLimit Execution gas limit that the signer agreed to pay.
-	/// @param gasPrice Gas price limit that the signer agreed to pay.
+	/// @param gasPriceLimit Gas price limit that the signer agreed to pay.
 	/// @param nonce Nonce of the internal transaction.
 	function forward(
 		IRelayer relayerContract,
 		bytes memory signature,
-		address relayer,
 		address signer,
 		address to ,
 		uint value,
 		bytes memory data,
-		uint gasLimit,
-		uint gasPrice,
+		uint gasPriceLimit,
 		uint256 nonce
 	)
 	isWhitelisted
 	public
 	{
-		require(
-			relayer == msg.sender || relayer == address(0),
-			"Invalid relayer"
-		);
 		require(
 			!hasTrustedContracts || trustedContracts[address(relayerContract)],
 			"Unauthorized destination"
@@ -102,13 +91,10 @@ contract Forwarder is OwnersMap {
 		uint256 startGas = gasleft();
 
 		bytes32 _hash = hashTxMessage(
-			relayer,
 			signer,
 			to,
 			value,
 			data,
-			gasLimit,
-			gasPrice,
 			nonce
 		);
 
@@ -121,16 +107,16 @@ contract Forwarder is OwnersMap {
 
 		require(
 			signerIsValid(_hash, signature, domainSeparator, signer),
-			"Signer is not whitelisted"
+			"Signer is not valid"
 		);
 		require(checkAndUpdateNonce(signer, nonce), "Nonce is invalid");
 
 		relayerContract.relayExecute(
-			signature, relayer, signer, to, value, data, gasLimit, gasPrice, nonce
+			signer, to, value, data
 		);
 
 		uint256 endGas = gasleft();
-		uint256 forwardGasPrice = gasPrice > tx.gasprice ? tx.gasprice : gasPrice;
+		uint256 forwardGasPrice = tx.gasprice < gasPriceLimit ? tx.gasprice : gasPriceLimit;
 		uint256 consumedGas = startGas.sub(endGas);
 		uint256 payment = forwardGasPrice * consumedGas;
 
@@ -142,17 +128,12 @@ contract Forwarder is OwnersMap {
 	/// @param to Destination address of internal transaction.
 	/// @param value Ether value of internal transaction.
 	/// @param data Data payload of internal transaction.
-	/// @param gasLimit Execution gas limit that the signer agreed to pay.
-	/// @param gasPrice Gas price limit that the signer agreed to pay.
 	/// @param nonce Nonce of the internal transaction.
 	function hashTxMessage(
-		address relayer,
 		address signer,
 		address to,
 		uint value,
 		bytes memory data,
-		uint256 gasLimit,
-		uint256 gasPrice,
 		uint256 nonce
 	)
 	public
@@ -161,13 +142,10 @@ contract Forwarder is OwnersMap {
 	{
 		return keccak256(abi.encode(
 			TXMESSAGE_TYPEHASH,
-			relayer,
 			signer,
 			to,
 			value,
 			keccak256(bytes(data)),
-			gasLimit,
-			gasPrice,
 			nonce
 		));
 	}
@@ -195,7 +173,7 @@ contract Forwarder is OwnersMap {
 	/// @param signature Signature to verify.
 	function signerIsValid(bytes32 message, bytes memory signature, bytes32 domainSeparator, address expectedSigner)
 	internal
-	view
+	pure
 	returns (bool)
 	{
 		bytes32 r;

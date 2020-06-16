@@ -39,7 +39,6 @@ contract('Forwarder contract', (accounts) => {
       destination: '0x0000000000000000000000000000000000000000',
       value: 0,
       data: '0x',
-      gasLimit: 0,
       gasPrice: 1,
       nonce: await getNonceForChannel(signer.address, 0),
     };
@@ -51,8 +50,8 @@ contract('Forwarder contract', (accounts) => {
     });
 
     const res = await forwarderContract.forward(
-      forwarderIdentityContract.address, signature, RELAYER, signer.address,
-      metatx.destination, metatx.value, metatx.data, metatx.gasLimit, metatx.gasPrice,
+      forwarderIdentityContract.address, signature, signer.address,
+      metatx.destination, metatx.value, metatx.data, metatx.gasPrice,
       metatx.nonce,
       { from: RELAYER }
     );
@@ -65,7 +64,6 @@ contract('Forwarder contract', (accounts) => {
       destination: '0x0000000000000000000000000000000000000000',
       value: 0,
       data: '0x',
-      gasLimit: 0,
       gasPrice: 1,
       nonce: await getNonceForChannel(signer.address, 0),
     };
@@ -78,8 +76,8 @@ contract('Forwarder contract', (accounts) => {
 
     try {
       const res = await forwarderContract.forward(
-        "0x0000000000000000000000000000000000000000", signature, RELAYER, signer.address,
-        metatx.destination, metatx.value, metatx.data, metatx.gasLimit, metatx.gasPrice,
+        "0x0000000000000000000000000000000000000000", signature, signer.address,
+        metatx.destination, metatx.value, metatx.data, metatx.gasPrice,
         metatx.nonce,
         { from: RELAYER }
       );
@@ -89,9 +87,9 @@ contract('Forwarder contract', (accounts) => {
     }
   });
 
-  const signMetaTx = async ({ signer, relayer, destination, value, data, gasLimit, gasPrice, nonce }) => {
+  const signMetaTx = async ({ signer, destination, value, data, nonce }) => {
     const hash = await forwarderContract.hashTxMessage(
-      relayer, signer.address, destination, value, data, gasLimit, gasPrice, nonce
+      signer.address, destination, value, data, nonce
     );
 
     const chainID = await web3.eth.net.getId();

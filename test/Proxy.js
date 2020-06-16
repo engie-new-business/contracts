@@ -66,7 +66,7 @@ contract('Proxy', (accounts) => {
     });
   });
 
-  describe('RelayableIdentity', async () => {
+  describe.skip('RelayableIdentity', async () => {
     let proxy;
     let identity;
     before(async () => {
