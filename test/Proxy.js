@@ -1,22 +1,24 @@
 const ethUtil = require('ethereumjs-util');
 const abi = require('ethereumjs-abi');
 
-const RelayableIdentity = artifacts.require("RelayableIdentity");
 const Proxy = artifacts.require("Proxy");
 const ProxyFactory = artifacts.require("ProxyFactory");
-const RelayableIdentityWihtoutPayement = artifacts.require("RelayableIdentityWihtoutPayement");
 const Forwarder = artifacts.require("Forwarder");
+const ForwarderSmartWallet = artifacts.require("ForwarderSmartWallet");
 const DummyForwarder = artifacts.require("DummyForwarder");
 const Relayers = artifacts.require("Relayers");
 
 contract('Proxy', (accounts) => {
   const RELAYER = accounts[0];
+  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
   let EOAs = []
-  let relayableIdentityContract;
-  let relayableIdentityWihtoutPayementContract;
+
+  let relayerContract;
+  let forwarderSmartWalletContract
   let forwarderContract;
   let proxyFactoryContract;
+  let dummyForwarderContract;
 
   before(async () => {
     for (var i = 0; i < 5; i++) {
@@ -24,14 +26,11 @@ contract('Proxy', (accounts) => {
     }
     Proxy.setWallet(web3.eth.accounts.wallet.add(EOAs[1]));
 
-    relayableIdentityContract = await RelayableIdentity.new(EOAs[0].address, { from: RELAYER });
-    relayableIdentityWihtoutPayementContract = await RelayableIdentityWihtoutPayement.new(EOAs[0].address, { from: RELAYER });
-    relayableIdentityWihtoutPayementContract = await RelayableIdentityWihtoutPayement.new(EOAs[0].address, { from: RELAYER });
     relayerContract = await Relayers.new([RELAYER], { from: RELAYER });
-    forwarderContract = await Forwarder.new(relayerContract.address, [relayableIdentityContract.address], { from: RELAYER });
-    dummyForwarderContract = await DummyForwarder.new(relayerContract.address, [relayableIdentityContract.address], { from: RELAYER });
-
+    forwarderSmartWalletContract = await ForwarderSmartWallet.new(ZERO_ADDRESS, ZERO_ADDRESS, { from: RELAYER });
+    forwarderContract = await Forwarder.new(ZERO_ADDRESS, [ZERO_ADDRESS], { from: RELAYER });
     proxyFactoryContract = await ProxyFactory.new({ from: RELAYER })
+    dummyForwarderContract = await DummyForwarder.new(ZERO_ADDRESS, [ZERO_ADDRESS], { from: RELAYER });
   });
 
   describe('ProxyFactory', async () => {
@@ -66,154 +65,53 @@ contract('Proxy', (accounts) => {
     });
   });
 
-  describe.skip('RelayableIdentity', async () => {
-    let proxy;
-    let identity;
-    before(async () => {
-      proxy = await deployProxy(EOAs[1].address, web3.utils.utf8ToHex("v0"), relayableIdentityContract.address, relayableIdentityContract.contract.methods.initialize().encodeABI())
-      identity = await RelayableIdentity.at(proxy.address);
-
-      await web3.eth.sendTransaction({
-        from: accounts[0],
-        to: proxy.address,
-        value: web3.utils.toWei('1', 'ether'),
-      });
-    });
-
-    it('should have good whitelist', async () => {
-      assert.isFalse(await relayableIdentityContract.owners(EOAs[1].address))
-      assert.isTrue(await identity.owners(EOAs[1].address))
-      assert.isTrue(await proxy.owners(EOAs[1].address))
-    });
-
-    it('should relay metatx', async () => {
-      const signer = EOAs[1];
-
-      const metatx = {
-        destination: '0x0000000000000000000000000000000000000000',
-        value: 0,
-        data: '0x',
-        gasLimit: 0,
-        gasPrice: 1,
-        nonce: await getNonceForChannel(identity, signer.address, 0),
-      };
-
-      const hash = await identity.hashTxMessage(
-        RELAYER, signer.address, metatx.destination, metatx.value, metatx.data, metatx.gasLimit, metatx.gasPrice, metatx.nonce
-      );
-
-      const signature = await signMetaTx(identity.address, hash, signer);
-
-      const res = await identity.relayExecute(
-        signature, RELAYER, signer.address,
-        metatx.destination, metatx.value, metatx.data, metatx.gasLimit, metatx.gasPrice,
-        metatx.nonce,
-        { from: RELAYER }
-      );
-
-      assert.equal(await getNonceForChannel(identity, signer.address, 0), 1)
-    });
-
-    it('should change implementation', async () => {
-      const signer = EOAs[1];
-      const metatx = {
-        destination: proxy.address,
-        value: 0,
-        data: proxy.contract.methods.upgradeTo(web3.utils.utf8ToHex("v2"), relayableIdentityWihtoutPayementContract.address).encodeABI(),
-        gasLimit: 0,
-        gasPrice: 1,
-        nonce: await getNonceForChannel(identity, signer.address, 0),
-      };
-
-      const hash = await identity.hashTxMessage(
-        RELAYER, signer.address, metatx.destination, metatx.value, metatx.data, metatx.gasLimit, metatx.gasPrice, metatx.nonce
-      );
-
-      const signature = await signMetaTx(identity.address, hash, signer);
-
-      const res = await identity.relayExecute(
-        signature, RELAYER, signer.address,
-        metatx.destination, metatx.value, metatx.data, metatx.gasLimit, metatx.gasPrice,
-        metatx.nonce,
-        { from: RELAYER }
-      );
-
-      assert.isTrue(res.logs[0].args.success);
-
-      identity = await RelayableIdentityWihtoutPayement.at(proxy.address)
-      assert.equal(await getNonceForChannel(identity, signer.address, 0), 2)
-    })
-
-    it('should make transaction withn new implementation', async () => {
-      const signer = EOAs[1];
-
-      const metatx = {
-        destination: '0x0000000000000000000000000000000000000000',
-        value: 0,
-        data: '0x',
-        nonce: await getNonceForChannel(identity, signer.address, 0),
-      };
-
-      const hash = await identity.hashTxMessage(
-        RELAYER, signer.address, metatx.destination, metatx.value, metatx.data, metatx.nonce
-      );
-
-      const signature = await signMetaTx(identity.address, hash, signer);
-
-      const res = await identity.relayExecute(
-        signature, RELAYER, signer.address,
-        metatx.destination, metatx.value, metatx.data,
-        metatx.nonce,
-        { from: RELAYER }
-      );
-      assert.equal(await getNonceForChannel(identity, signer.address, 0), 3)
-    });
-  });
-
   describe('Forwarder', async () => {
-    let proxy;
+    let proxyForwarder;
     let forwarder;
+    let smartWallet;
 
     before(async () => {
-      proxy = await deployProxy(EOAs[1].address, web3.utils.utf8ToHex("v0"), forwarderContract.address, forwarderContract.contract.methods.initialize(relayerContract.address, [relayableIdentityContract.address]).encodeABI(), { from: RELAYER });
-      forwarder = await Forwarder.at(proxy.address)
+      proxyForwarder = await deployProxy(EOAs[1].address, web3.utils.utf8ToHex("v0"), forwarderContract.address, forwarderContract.contract.methods.initialize(relayerContract.address, []).encodeABI(), { from: RELAYER });
+      forwarder = await Forwarder.at(proxyForwarder.address)
+      proxySmartWallet = await deployProxy(EOAs[1].address, web3.utils.utf8ToHex("v0"), forwarderSmartWalletContract.address, forwarderSmartWalletContract.contract.methods.initialize(forwarder.address).encodeABI(), { from: RELAYER });
+      smartWallet = await ForwarderSmartWallet.at(proxySmartWallet.address)
 
       await web3.eth.sendTransaction({
         from: accounts[0],
-        to: relayableIdentityContract.address,
+        to: smartWallet.address,
         value: web3.utils.toWei('1', 'ether'),
       });
       await web3.eth.sendTransaction({
         from: accounts[0],
-        to: proxy.address,
+        to: proxyForwarder.address,
         value: web3.utils.toWei('1', 'ether'),
       });
     });
 
     it('should have a version and implementation', async () => {
-      assert.equal(web3.utils.hexToUtf8(await proxy.version()), "v0")
-      assert.equal(await proxy.implementation(), forwarderContract.address)
+      assert.equal(web3.utils.hexToUtf8(await proxyForwarder.version()), "v0")
+      assert.equal(await proxyForwarder.implementation(), forwarderContract.address)
     });
 
-    it('should forward a meta tx to an identity', async () => {
-      const signer = EOAs[0];
+    it('should forward a meta tx to an smart wallet', async () => {
+      const signer = EOAs[1];
       const metatx = {
         destination: '0x0000000000000000000000000000000000000000',
         value: 0,
         data: '0x',
         gasLimit: 0,
         gasPrice: 1,
-        nonce: await getNonceForChannel(relayableIdentityContract, signer.address, 0),
+        nonce: await getNonceForChannel(forwarder, signer.address, 0),
       };
 
-      const hash = await relayableIdentityContract.hashTxMessage(
-        RELAYER, signer.address, metatx.destination, metatx.value, metatx.data, metatx.gasLimit, metatx.gasPrice, metatx.nonce
+      const hash = await forwarder.hashTxMessage(
+        signer.address, metatx.destination, metatx.value, metatx.data, metatx.nonce
       );
-      const signature = await signMetaTx(relayableIdentityContract.address, hash, signer);
+      const signature = await signMetaTx(smartWallet.address, hash, signer);
 
       const res = await forwarder.forward(
-        relayableIdentityContract.address, signature, RELAYER, signer.address,
-        metatx.destination, metatx.value, metatx.data, metatx.gasLimit, metatx.gasPrice,
+        smartWallet.address, signature, signer.address,
+        metatx.destination, metatx.value, metatx.data, metatx.gasPrice,
         metatx.nonce,
         { from: RELAYER }
       );
@@ -224,16 +122,16 @@ contract('Proxy', (accounts) => {
 
       let tx = await signer.signTransaction({
         from: signer.address,
-        to: proxy.address,
+        to: proxyForwarder.address,
         value: '0',
         gas: 300000,
         gasPrice: 0,
-        data: await proxy.contract.methods.upgradeTo(web3.utils.utf8ToHex("v2"), dummyForwarderContract.address).encodeABI(),
+        data: await proxyForwarder.contract.methods.upgradeTo(web3.utils.utf8ToHex("v2"), dummyForwarderContract.address).encodeABI(),
       })
 
       try {
         await web3.eth.sendSignedTransaction(tx.rawTransaction)
-        forwarder = await DummyForwarder.at(proxy.address)
+        forwarder = await DummyForwarder.at(proxyForwarder.address)
         assert.equal(await forwarder.dummyFunction(), "dummy")
       } catch (e) {
         assert.fail("got know error")

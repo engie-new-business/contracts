@@ -74,14 +74,14 @@ contract Forwarder is OwnersMap {
 		IRelayer relayerContract,
 		bytes memory signature,
 		address signer,
-		address to ,
+		address to,
 		uint value,
 		bytes memory data,
 		uint gasPriceLimit,
 		uint256 nonce
 	)
-	isWhitelisted
-	public
+		isWhitelisted
+		public
 	{
 		require(
 			!hasTrustedContracts || trustedContracts[address(relayerContract)],
@@ -136,9 +136,9 @@ contract Forwarder is OwnersMap {
 		bytes memory data,
 		uint256 nonce
 	)
-	public
-	pure
-	returns (bytes32)
+		public
+		pure
+		returns (bytes32)
 	{
 		return keccak256(abi.encode(
 			TXMESSAGE_TYPEHASH,
@@ -154,8 +154,8 @@ contract Forwarder is OwnersMap {
 	/// @param signer Signer of the signature.
 	/// @param nonce Nonce of the internal transaction.
 	function checkAndUpdateNonce(address signer, uint256 nonce)
-	internal
-	returns (bool)
+		internal
+		returns (bool)
 	{
 		uint128 _channelId = uint128(nonce / 2**128);
 		uint128 _channelNonce = uint128(nonce % 2**128);
@@ -172,9 +172,9 @@ contract Forwarder is OwnersMap {
 	/// @param message Message without signature.
 	/// @param signature Signature to verify.
 	function signerIsValid(bytes32 message, bytes memory signature, bytes32 domainSeparator, address expectedSigner)
-	internal
-	pure
-	returns (bool)
+		internal
+		pure
+		returns (bool)
 	{
 		bytes32 r;
 		bytes32 s;
@@ -214,9 +214,9 @@ contract Forwarder is OwnersMap {
 	/// @param _verifyingContract Contract address.
 	/// @param _chainId Blockchain chain id.
 	function hashEIP712Domain(address _verifyingContract, uint256 _chainId)
-	internal
-	pure
-	returns (bytes32)
+		internal
+		pure
+		returns (bytes32)
 	{
 		return keccak256(abi.encode(
 			EIP712DOMAIN_TYPEHASH,

@@ -3,15 +3,14 @@ const abi = require('ethereumjs-abi');
 
 const Relayers = artifacts.require("Relayers");
 const Forwarder = artifacts.require("Forwarder");
-const ForwarderIdentity = artifacts.require("ForwarderIdentity");
+const ForwarderSmartWallet = artifacts.require("ForwarderSmartWallet");
 
 contract('Forwarder contract', (accounts) => {
   const RELAYER = accounts[0];
 
   let EOAs = []
-  let forwarderIdentityContract;
+  let forwarderSmartWalletContract;
   let forwarderContract;
-
 
   before(async () => {
     for (var i = 0; i < 5; i++) {
@@ -19,11 +18,11 @@ contract('Forwarder contract', (accounts) => {
     }
     relayerContract = await Relayers.new([RELAYER], { from: RELAYER });
     forwarderContract = await Forwarder.new(relayerContract.address, [], { from: RELAYER });
-    forwarderIdentityContract = await ForwarderIdentity.new(EOAs[0].address, forwarderContract.address, { from: RELAYER });
+    forwarderSmartWalletContract = await ForwarderSmartWallet.new(EOAs[0].address, forwarderContract.address, { from: RELAYER });
 
     await web3.eth.sendTransaction({
       from: accounts[0],
-      to: forwarderIdentityContract.address,
+      to: forwarderSmartWalletContract.address,
       value: web3.utils.toWei('1', 'ether'),
     });
     await web3.eth.sendTransaction({
@@ -33,7 +32,7 @@ contract('Forwarder contract', (accounts) => {
     });
   });
 
-  it('should forward a meta tx to an identity', async () => {
+  it('should forward a meta tx to an smart wallet', async () => {
     const signer = EOAs[0];
     const metatx = {
       destination: '0x0000000000000000000000000000000000000000',
@@ -50,7 +49,7 @@ contract('Forwarder contract', (accounts) => {
     });
 
     const res = await forwarderContract.forward(
-      forwarderIdentityContract.address, signature, signer.address,
+      forwarderSmartWalletContract.address, signature, signer.address,
       metatx.destination, metatx.value, metatx.data, metatx.gasPrice,
       metatx.nonce,
       { from: RELAYER }
@@ -95,7 +94,7 @@ contract('Forwarder contract', (accounts) => {
     const chainID = await web3.eth.net.getId();
     const domain = {
       chainId: chainID,
-      verifyingContract: forwarderIdentityContract.address,
+      verifyingContract: forwarderSmartWalletContract.address,
     };
 
     const hashBuf = new Buffer(hash.substring(2), 'hex');

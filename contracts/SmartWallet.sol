@@ -1,10 +1,10 @@
 pragma solidity >=0.6.0 <0.7.0;
 pragma experimental ABIEncoderV2;
 
-import "./IIdentity.sol";
+import "./ISmartWallet.sol";
 import "./OwnersMap.sol";
 
-contract Identity is OwnersMap, IIdentity {
+contract SmartWallet is OwnersMap, ISmartWallet {
 	mapping(bytes32 => bytes) store;
 
 	event UpdateOwners(address account, bool value);
