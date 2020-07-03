@@ -36,8 +36,8 @@ contract ForwarderSmartWallet is SmartWallet, IRelayer, ERC165 {
 		_registerInterface(_INTERFACE_ID_RELAYER);
 	}
 
-	/// @dev Relay a transaction and then pays the relayer.
-	/// @param signer Signer of the signature.
+	/// @dev Relay a transaction sended by the authorized forwarder.
+	/// @param signer Signer of the signature received by the forwarder.
 	/// @param to Destination address of internal transaction .
 	/// @param value Ether value of internal transaction.
 	/// @param data Data payload of internal transaction.
