@@ -3,13 +3,13 @@ const abi = require('ethereumjs-abi');
 
 const Relayers = artifacts.require("Relayers");
 const Forwarder = artifacts.require("Forwarder");
-const ForwarderSmartWallet = artifacts.require("ForwarderSmartWallet");
+const SmartWallet = artifacts.require("SmartWallet");
 
 contract('Forwarder contract', (accounts) => {
   const RELAYER = accounts[0];
 
   let EOAs = []
-  let forwarderSmartWalletContract;
+  let smartWalletContract;
   let forwarderContract;
 
   before(async () => {
@@ -18,11 +18,11 @@ contract('Forwarder contract', (accounts) => {
     }
     relayerContract = await Relayers.new([RELAYER], { from: RELAYER });
     forwarderContract = await Forwarder.new(relayerContract.address, [], { from: RELAYER });
-    forwarderSmartWalletContract = await ForwarderSmartWallet.new(EOAs[0].address, forwarderContract.address, { from: RELAYER });
+    smartWalletContract = await SmartWallet.new(EOAs[0].address, forwarderContract.address, { from: RELAYER });
 
     await web3.eth.sendTransaction({
       from: accounts[0],
-      to: forwarderSmartWalletContract.address,
+      to: smartWalletContract.address,
       value: web3.utils.toWei('1', 'ether'),
     });
     await web3.eth.sendTransaction({
@@ -49,7 +49,7 @@ contract('Forwarder contract', (accounts) => {
     });
 
     const res = await forwarderContract.forward(
-      forwarderSmartWalletContract.address, signature, signer.address,
+      smartWalletContract.address, signature, signer.address,
       metatx.destination, metatx.value, metatx.data, metatx.gasPrice,
       metatx.nonce,
       { from: RELAYER }
@@ -94,7 +94,7 @@ contract('Forwarder contract', (accounts) => {
     const chainID = await web3.eth.net.getId();
     const domain = {
       chainId: chainID,
-      verifyingContract: forwarderSmartWalletContract.address,
+      verifyingContract: smartWalletContract.address,
     };
 
     const hashBuf = new Buffer(hash.substring(2), 'hex');

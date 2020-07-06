@@ -4,7 +4,7 @@ const abi = require('ethereumjs-abi');
 const Proxy = artifacts.require("Proxy");
 const ProxyFactory = artifacts.require("ProxyFactory");
 const Forwarder = artifacts.require("Forwarder");
-const ForwarderSmartWallet = artifacts.require("ForwarderSmartWallet");
+const SmartWallet = artifacts.require("SmartWallet");
 const DummyForwarder = artifacts.require("DummyForwarder");
 const Relayers = artifacts.require("Relayers");
 
@@ -15,7 +15,7 @@ contract('Proxy', (accounts) => {
   let EOAs = []
 
   let relayerContract;
-  let forwarderSmartWalletContract
+  let smartWalletContract
   let forwarderContract;
   let proxyFactoryContract;
   let dummyForwarderContract;
@@ -27,7 +27,7 @@ contract('Proxy', (accounts) => {
     Proxy.setWallet(web3.eth.accounts.wallet.add(EOAs[1]));
 
     relayerContract = await Relayers.new([RELAYER], { from: RELAYER });
-    forwarderSmartWalletContract = await ForwarderSmartWallet.new(ZERO_ADDRESS, ZERO_ADDRESS, { from: RELAYER });
+    smartWalletContract = await SmartWallet.new(ZERO_ADDRESS, ZERO_ADDRESS, { from: RELAYER });
     forwarderContract = await Forwarder.new(ZERO_ADDRESS, [ZERO_ADDRESS], { from: RELAYER });
     proxyFactoryContract = await ProxyFactory.new({ from: RELAYER })
     dummyForwarderContract = await DummyForwarder.new(ZERO_ADDRESS, [ZERO_ADDRESS], { from: RELAYER });
@@ -73,8 +73,8 @@ contract('Proxy', (accounts) => {
     before(async () => {
       proxyForwarder = await deployProxy(EOAs[1].address, web3.utils.utf8ToHex("v0"), forwarderContract.address, forwarderContract.contract.methods.initialize(relayerContract.address, []).encodeABI(), { from: RELAYER });
       forwarder = await Forwarder.at(proxyForwarder.address)
-      proxySmartWallet = await deployProxy(EOAs[1].address, web3.utils.utf8ToHex("v0"), forwarderSmartWalletContract.address, forwarderSmartWalletContract.contract.methods.initialize(forwarder.address).encodeABI(), { from: RELAYER });
-      smartWallet = await ForwarderSmartWallet.at(proxySmartWallet.address)
+      proxySmartWallet = await deployProxy(EOAs[1].address, web3.utils.utf8ToHex("v0"), smartWalletContract.address, smartWalletContract.contract.methods.initialize(forwarder.address).encodeABI(), { from: RELAYER });
+      smartWallet = await SmartWallet.at(proxySmartWallet.address)
 
       await web3.eth.sendTransaction({
         from: accounts[0],
