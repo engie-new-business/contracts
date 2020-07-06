@@ -24,7 +24,7 @@ contract SmartWallet is OwnersMap, ISmartWallet, IRelayDestination, ERC165 {
 	address public authorizedForwarder;
 
 	bytes4 private constant _INTERFACE_ID_SMART_WALLET = 0xfb07fcd2;
-	bytes4 private constant _INTERFACE_ID_RELAYER = 0xd9fb9e4a;
+	bytes4 private constant _INTERFACE_ID_RELAY_DESTINATION = 0xd9fb9e4a;
 
 	event RelayedExecute (bool success);
 
@@ -42,7 +42,7 @@ contract SmartWallet is OwnersMap, ISmartWallet, IRelayDestination, ERC165 {
 
 		authorizedForwarder = forwarder;
 		_registerInterface(_INTERFACE_ID_SMART_WALLET);
-		_registerInterface(_INTERFACE_ID_RELAYER);
+		_registerInterface(_INTERFACE_ID_RELAY_DESTINATION);
 	}
 
 	/// @dev Fallback function for receiving Ether, emit an event.
