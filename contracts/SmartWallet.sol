@@ -1,13 +1,13 @@
 pragma solidity >=0.6.0 <0.7.0;
 pragma experimental ABIEncoderV2;
 
-import "./ISmartWallet.sol";
 import "./OwnersMap.sol";
 import "./SafeMath.sol";
 import "./ERC165/ERC165.sol";
-import "./IRelayer.sol";
+import "./IRelayDestination.sol";
+import "./ISmartWallet.sol";
 
-contract SmartWallet is OwnersMap, ISmartWallet, IRelayer, ERC165 {
+contract SmartWallet is OwnersMap, ISmartWallet, IRelayDestination, ERC165 {
 	using SafeMath for uint256;
 
 	mapping(bytes32 => bytes) store;
@@ -65,7 +65,7 @@ contract SmartWallet is OwnersMap, ISmartWallet, IRelayer, ERC165 {
 		);
 	}
 
-	/// @dev Execute a deplaoy call if the sender is an owner.
+	/// @dev Execute a deploy call if the sender is an owner.
 	/// @param value Ether value for the call.
 	/// @param salt Salt used for create2.
 	/// @param initCode Code of the smart contract.
@@ -183,7 +183,7 @@ contract SmartWallet is OwnersMap, ISmartWallet, IRelayer, ERC165 {
 		}
 	}
 
-	/// @dev Relay a transaction sended by the authorized forwarder.
+	/// @dev Execute a transaction sent by the authorized forwarder.
 	/// @param signer Signer of the signature received by the forwarder.
 	/// @param to Destination address of internal transaction .
 	/// @param value Ether value of internal transaction.
@@ -199,7 +199,7 @@ contract SmartWallet is OwnersMap, ISmartWallet, IRelayer, ERC165 {
 	{
 		require(
 			msg.sender == authorizedForwarder,
-			"Sender is not the allowed forwarder"
+			"Sender is not the authorized forwarder"
 		);
 
 		require(

@@ -1,13 +1,13 @@
 pragma solidity >=0.6.0 <0.7.0;
 
-import "./IRelayer.sol";
+import "./IRelayDestination.sol";
 import "./SafeMath.sol";
-import "./Relayers.sol";
+import "./AuthorizedRelayers.sol";
 import "./OwnersMap.sol";
 
 contract Forwarder is OwnersMap {
 	using SafeMath for uint256;
-	Relayers public relayers;
+	AuthorizedRelayers public relayers;
 	mapping(address => bool) public trustedContracts;
 	bool internal hasTrustedContracts;
 	bool public initialized;
@@ -27,18 +27,18 @@ contract Forwarder is OwnersMap {
 		_;
 	}
 
-	constructor(address relayersAddress, address[] memory contracts) public {
-		initialize(relayersAddress, contracts);
+	constructor(address relayersAddress, address[] memory _trustedContracts) public {
+		initialize(relayersAddress, _trustedContracts);
 	}
 
-	function initialize(address relayersAddress, address[] memory contracts) public {
+	function initialize(address relayersAddress, address[] memory _trustedContracts) public {
 		require(!initialized, "Contract already initialized");
 		initialized = true;
 
-		relayers = Relayers(relayersAddress);
-		hasTrustedContracts = contracts.length > 0;
-		for(uint256 i = 0; i < contracts.length; i++) {
-			trustedContracts[contracts[i]] = true;
+		relayers = AuthorizedRelayers(relayersAddress);
+		hasTrustedContracts = _trustedContracts.length > 0;
+		for(uint256 i = 0; i < _trustedContracts.length; i++) {
+			trustedContracts[_trustedContracts[i]] = true;
 		}
 	}
 
@@ -56,22 +56,22 @@ contract Forwarder is OwnersMap {
 
 	function changeRelayersSource(address relayersAddress) public {
 		require(owners[msg.sender], "Sender is not an owner");
-		relayers = Relayers(relayersAddress);
+		relayers = AuthorizedRelayers(relayersAddress);
 	}
 
 	receive() external payable { }
 
-	/// @dev Forwards a meta transaction to a relayer contract.
-	/// @param relayerContract Address of the relayer contract that must relay the transaction
+	/// @dev Forwards a meta transaction to a destination contract that implements IRelayDestination interface.
+	/// @param destinationContract Address of the destination contract that must execute the transaction
 	/// @param signature Signature by the signer of the other params.
 	/// @param signer Signer of the signature.
-	/// @param to Destination address of internal transaction .
+	/// @param to Destination address of internal transaction.
 	/// @param value Ether value of internal transaction.
 	/// @param data Data payload of internal transaction.
 	/// @param gasPriceLimit Gas price limit that the signer agreed to pay.
 	/// @param nonce Nonce of the internal transaction.
 	function forward(
-		IRelayer relayerContract,
+		IRelayDestination destinationContract,
 		bytes memory signature,
 		address signer,
 		address to,
@@ -84,7 +84,7 @@ contract Forwarder is OwnersMap {
 		public
 	{
 		require(
-			!hasTrustedContracts || trustedContracts[address(relayerContract)],
+			!hasTrustedContracts || trustedContracts[address(destinationContract)],
 			"Unauthorized destination"
 		);
 
@@ -103,7 +103,7 @@ contract Forwarder is OwnersMap {
 		assembly {
 			id := chainid()
 		}
-		bytes32 domainSeparator = hashEIP712Domain(address(relayerContract), id);
+		bytes32 domainSeparator = hashEIP712Domain(address(destinationContract), id);
 
 		require(
 			signerIsValid(_hash, signature, domainSeparator, signer),
@@ -111,7 +111,7 @@ contract Forwarder is OwnersMap {
 		);
 		require(checkAndUpdateNonce(signer, nonce), "Nonce is invalid");
 
-		relayerContract.relayExecute(
+		destinationContract.relayExecute(
 			signer, to, value, data
 		);
 
@@ -120,7 +120,7 @@ contract Forwarder is OwnersMap {
 		uint256 consumedGas = startGas.sub(endGas);
 		uint256 payment = forwardGasPrice * consumedGas;
 
-		require(msg.sender.send(payment), "Could not pay relayer gas costs with ether");
+		require(msg.sender.send(payment), "Could not refund gas to relayer");
 	}
 
 	/// @dev Message to sign expected for relay transaction.
@@ -150,7 +150,7 @@ contract Forwarder is OwnersMap {
 		));
 	}
 
-	/// @dev Verify if the nonce is good and then update it.
+	/// @dev Verify the nonce and then update it.
 	/// @param signer Signer of the signature.
 	/// @param nonce Nonce of the internal transaction.
 	function checkAndUpdateNonce(address signer, uint256 nonce)

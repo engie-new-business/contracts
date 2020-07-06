@@ -6,7 +6,7 @@ const ProxyFactory = artifacts.require("ProxyFactory");
 const Forwarder = artifacts.require("Forwarder");
 const SmartWallet = artifacts.require("SmartWallet");
 const DummyForwarder = artifacts.require("DummyForwarder");
-const Relayers = artifacts.require("Relayers");
+const AuthorizedRelayers = artifacts.require("AuthorizedRelayers");
 
 contract('Proxy', (accounts) => {
   const RELAYER = accounts[0];
@@ -14,7 +14,7 @@ contract('Proxy', (accounts) => {
 
   let EOAs = []
 
-  let relayerContract;
+  let authorizedRelayersContract;
   let smartWalletContract
   let forwarderContract;
   let proxyFactoryContract;
@@ -26,7 +26,7 @@ contract('Proxy', (accounts) => {
     }
     Proxy.setWallet(web3.eth.accounts.wallet.add(EOAs[1]));
 
-    relayerContract = await Relayers.new([RELAYER], { from: RELAYER });
+    authorizedRelayersContract = await AuthorizedRelayers.new([RELAYER], { from: RELAYER });
     smartWalletContract = await SmartWallet.new(ZERO_ADDRESS, ZERO_ADDRESS, { from: RELAYER });
     forwarderContract = await Forwarder.new(ZERO_ADDRESS, [ZERO_ADDRESS], { from: RELAYER });
     proxyFactoryContract = await ProxyFactory.new({ from: RELAYER })
@@ -71,7 +71,7 @@ contract('Proxy', (accounts) => {
     let smartWallet;
 
     before(async () => {
-      proxyForwarder = await deployProxy(EOAs[1].address, web3.utils.utf8ToHex("v0"), forwarderContract.address, forwarderContract.contract.methods.initialize(relayerContract.address, []).encodeABI(), { from: RELAYER });
+      proxyForwarder = await deployProxy(EOAs[1].address, web3.utils.utf8ToHex("v0"), forwarderContract.address, forwarderContract.contract.methods.initialize(authorizedRelayersContract.address, []).encodeABI(), { from: RELAYER });
       forwarder = await Forwarder.at(proxyForwarder.address)
       proxySmartWallet = await deployProxy(EOAs[1].address, web3.utils.utf8ToHex("v0"), smartWalletContract.address, smartWalletContract.contract.methods.initialize(forwarder.address).encodeABI(), { from: RELAYER });
       smartWallet = await SmartWallet.at(proxySmartWallet.address)

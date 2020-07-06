@@ -1,29 +1,29 @@
 pragma solidity >=0.6.0 <0.7.0;
 
-import "../IRelayer.sol";
+import "../IRelayDestination.sol";
 import "../SafeMath.sol";
-import "../Relayers.sol";
+import "../AuthorizedRelayers.sol";
 import "../OwnersMap.sol";
 
 contract DummyForwarder is OwnersMap {
 	using SafeMath for uint256;
-	Relayers public relayers;
+	AuthorizedRelayers public relayers;
 	mapping(address => bool) public trustedContracts;
 	bool public initialized;
 
-    modifier isWhitelisted {
-        require(relayers.verify(msg.sender), "Invalid sender");
-        _;
-    }
+	modifier isWhitelisted {
+		require(relayers.verify(msg.sender), "Invalid sender");
+		_;
+	}
 
-    constructor(address relayersAddress, address[] memory contracts) public {
-        initialize(relayersAddress, contracts);
-    }
+	constructor(address relayersAddress, address[] memory contracts) public {
+		initialize(relayersAddress, contracts);
+	}
 
 	function initialize(address relayersAddress, address[] memory contracts) public {
 		require(!initialized, "Contract already initialized");
 		initialized = true;
-		relayers = Relayers(relayersAddress);
+		relayers = AuthorizedRelayers(relayersAddress);
 		for(uint256 i = 0; i < contracts.length; i++) {
 			trustedContracts[contracts[i]] = true;
 		}
@@ -38,7 +38,7 @@ contract DummyForwarder is OwnersMap {
 
 	function changeRelayersSource(address relayersAddress) public {
 		require(owners[msg.sender], "Sender is not an owner");
-        relayers = Relayers(relayersAddress);
+		relayers = AuthorizedRelayers(relayersAddress);
 	}
 
 	receive() external payable { }
@@ -48,7 +48,7 @@ contract DummyForwarder is OwnersMap {
 	}
 
 	function forward(
-		IRelayer relayerContract,
+		IRelayDestination relayerContract,
 		address relayer,
 		address signer,
 		address to ,
@@ -56,8 +56,8 @@ contract DummyForwarder is OwnersMap {
 		bytes memory data,
 		uint gasPrice
 	)
-	    isWhitelisted
-		public
+	isWhitelisted
+	public
 	{
 		require(
 			relayer == msg.sender || relayer == address(0),

@@ -1,13 +1,13 @@
 pragma solidity >=0.6.0 <0.7.0;
 
-contract Relayers {
+contract AuthorizedRelayers {
 	mapping(address => bool) public whitelist;
 	address public owner;
 
 	modifier onlyOwner() {
-        require(msg.sender == owner, "caller is not the owner");
-        _;
-    }
+		require(msg.sender == owner, "caller is not the owner");
+		_;
+	}
 
 	constructor(address[] memory senders) public {
 		owner = msg.sender;

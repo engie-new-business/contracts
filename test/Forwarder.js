@@ -1,7 +1,7 @@
 const ethUtil = require('ethereumjs-util');
 const abi = require('ethereumjs-abi');
 
-const Relayers = artifacts.require("Relayers");
+const AuthorizedRelayers = artifacts.require("AuthorizedRelayers");
 const Forwarder = artifacts.require("Forwarder");
 const SmartWallet = artifacts.require("SmartWallet");
 
@@ -16,8 +16,8 @@ contract('Forwarder contract', (accounts) => {
     for (var i = 0; i < 5; i++) {
       EOAs[i] = web3.eth.accounts.create();
     }
-    relayerContract = await Relayers.new([RELAYER], { from: RELAYER });
-    forwarderContract = await Forwarder.new(relayerContract.address, [], { from: RELAYER });
+    authorizedRelayersContract = await AuthorizedRelayers.new([RELAYER], { from: RELAYER });
+    forwarderContract = await Forwarder.new(authorizedRelayersContract.address, [], { from: RELAYER });
     smartWalletContract = await SmartWallet.new(EOAs[0].address, forwarderContract.address, { from: RELAYER });
 
     await web3.eth.sendTransaction({
@@ -57,7 +57,7 @@ contract('Forwarder contract', (accounts) => {
   });
 
   it('should not allow invalid destination', async () => {
-    const forwarderContract = await Forwarder.new(relayerContract.address, ['0x0000000000000000000000000000000000000001'], { from: RELAYER });
+    const forwarderContract = await Forwarder.new(authorizedRelayersContract.address, ['0x0000000000000000000000000000000000000001'], { from: RELAYER });
     const signer = EOAs[0];
     const metatx = {
       destination: '0x0000000000000000000000000000000000000000',
