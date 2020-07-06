@@ -1,18 +1,18 @@
 pragma solidity >=0.6.0 <0.7.0;
 
-import "../IIdentity.sol";
-import "../IRelayer.sol";
+import "../SmartWallet.sol";
+import "../IRelayDestination.sol";
 
 contract Selector {
     // 0xfb07fcd2
-    function getIdentityEIP165ID() external pure returns (bytes4) {
-        IIdentity i;
+    function getSmartWalletEIP165ID() external pure returns (bytes4) {
+        SmartWallet i;
         return  i.getData.selector ^ i.setData.selector ^ i.execute.selector ^ i.deploy.selector;
     }
 
-    // 0x89dae43a
-    function getRelayerEIP165ID() external pure returns (bytes4) {
-        IRelayer i;
+    // 0xd9fb9e4a
+    function getRelayDestinationEIP165ID() external pure returns (bytes4) {
+        IRelayDestination i;
         return  i.relayExecute.selector;
     }
 }

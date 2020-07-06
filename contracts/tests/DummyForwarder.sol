@@ -1,29 +1,29 @@
 pragma solidity >=0.6.0 <0.7.0;
 
-import "../IRelayer.sol";
+import "../IRelayDestination.sol";
 import "../SafeMath.sol";
-import "../Relayers.sol";
+import "../AuthorizedRelayers.sol";
 import "../OwnersMap.sol";
 
 contract DummyForwarder is OwnersMap {
 	using SafeMath for uint256;
-	Relayers public relayers;
+	AuthorizedRelayers public relayers;
 	mapping(address => bool) public trustedContracts;
 	bool public initialized;
 
-    modifier isWhitelisted {
-        require(relayers.verify(msg.sender), "Invalid sender");
-        _;
-    }
+	modifier isWhitelisted {
+		require(relayers.verify(msg.sender), "Invalid sender");
+		_;
+	}
 
-    constructor(address relayersAddress, address[] memory contracts) public {
-        initialize(relayersAddress, contracts);
-    }
+	constructor(address relayersAddress, address[] memory contracts) public {
+		initialize(relayersAddress, contracts);
+	}
 
 	function initialize(address relayersAddress, address[] memory contracts) public {
 		require(!initialized, "Contract already initialized");
 		initialized = true;
-		relayers = Relayers(relayersAddress);
+		relayers = AuthorizedRelayers(relayersAddress);
 		for(uint256 i = 0; i < contracts.length; i++) {
 			trustedContracts[contracts[i]] = true;
 		}
@@ -38,7 +38,7 @@ contract DummyForwarder is OwnersMap {
 
 	function changeRelayersSource(address relayersAddress) public {
 		require(owners[msg.sender], "Sender is not an owner");
-        relayers = Relayers(relayersAddress);
+		relayers = AuthorizedRelayers(relayersAddress);
 	}
 
 	receive() external payable { }
@@ -47,30 +47,17 @@ contract DummyForwarder is OwnersMap {
 		return "dummy";
 	}
 
-	/// @dev Forwards a meta transaction to a relayer contract.
-	/// @param relayerContract Address of the relayer contract that must relay the transaction
-	/// @param signature Signature by the signer of the other params.
-	/// @param signer Signer of the signature.
-	/// @param to Destination address of internal transaction .
-	/// @param value Ether value of internal transaction.
-	/// @param data Data payload of internal transaction.
-	/// @param gasLimit Execution gas limit that the signer agreed to pay.
-	/// @param gasPrice Gas price limit that the signer agreed to pay.
-	/// @param nonce Nonce of the internal transaction.
 	function forward(
-		IRelayer relayerContract,
-		bytes memory signature,
+		IRelayDestination relayerContract,
 		address relayer,
 		address signer,
 		address to ,
 		uint value,
 		bytes memory data,
-		uint gasLimit,
-		uint gasPrice,
-		uint256 nonce
+		uint gasPrice
 	)
-	    isWhitelisted
-		public
+	isWhitelisted
+	public
 	{
 		require(
 			relayer == msg.sender || relayer == address(0),

@@ -2,6 +2,7 @@ pragma solidity >=0.6.0 <0.7.0;
 
 import "./OwnersMap.sol";
 
+/// @dev Proxy implementation based on https://blog.openzeppelin.com/proxy-patterns/
 contract Proxy is OwnersMap {
     /**
      * @dev Storage slot with the admin of the contract.

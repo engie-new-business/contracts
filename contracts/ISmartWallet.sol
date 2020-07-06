@@ -1,6 +1,6 @@
 pragma solidity >=0.6.0 <0.7.0;
 
-interface IIdentity {
+interface ISmartWallet {
 	event Received (address indexed sender, uint value);
 	event DataChanged(bytes32 indexed key, bytes value);
 	event Executed(address destination, uint256 value, bytes data);
