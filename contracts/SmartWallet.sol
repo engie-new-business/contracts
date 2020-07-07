@@ -184,34 +184,26 @@ contract SmartWallet is OwnersMap, ISmartWallet, IRelayDestination, ERC165 {
 	}
 
 	/// @dev Execute a transaction sent by the authorized forwarder.
-	/// @param signer Signer of the signature received by the forwarder.
-	/// @param to Destination address of internal transaction .
-	/// @param value Ether value of internal transaction.
-	/// @param data Data payload of internal transaction.
+	/// @param signer Signer of the parameters
+	/// @param data Data payload of internal transaction. Signer of the transaction is appended to data
 	function relayExecute(
 		address signer,
-		address to,
-		uint value,
 		bytes memory data
 	)
 		public
 		override
 	{
 		require(
-			msg.sender == authorizedForwarder,
-			"Sender is not the authorized forwarder"
-		);
-
-		require(
 			owners[signer],
 			"Signer is not owner"
 		);
 
+		(address to, uint256 value, bytes memory innerData) = abi.decode(data, (address,uint256,bytes));
 		bool success = executeCall(
 			gasleft(),
 			to,
 			value,
-			data
+			innerData
 		);
 		emit RelayedExecute(success);
 	}

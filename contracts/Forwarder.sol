@@ -16,9 +16,9 @@ contract Forwarder is OwnersMap {
 	bytes32 constant EIP712DOMAIN_TYPEHASH =
 		0xa1f4e2f207746c24e01c8e10e467322f5fea4cccab3cd2f1c95d700b6a0c218b;
 
-	// keccak256("TxMessage(address signer,address to,uint256 value,bytes data,uint256 nonce)")
+	// keccak256("TxMessage(address signer,bytes data,uint256 nonce)")
 	bytes32 constant TXMESSAGE_TYPEHASH =
-		0xd3a5dbc47f098f34f663b1d3b74bd4df78ba7e6428e04914120023dfcd11b99b;
+		0x4a5440ef85933790132a0c37df00d9107524b193e1d52ee4fab75c228cece86e;
 
 	bytes32 eip712DomainSeparator;
 	mapping(address => mapping(uint128 => uint128)) public channels;
@@ -73,8 +73,6 @@ contract Forwarder is OwnersMap {
 	/// @param destinationContract Address of the destination contract that must execute the transaction
 	/// @param signature Signature by the signer of the other params.
 	/// @param signer Signer of the signature.
-	/// @param to Destination address of internal transaction.
-	/// @param value Ether value of internal transaction.
 	/// @param data Data payload of internal transaction.
 	/// @param gasPriceLimit Gas price limit that the signer agreed to pay.
 	/// @param nonce Nonce of the internal transaction.
@@ -82,8 +80,6 @@ contract Forwarder is OwnersMap {
 		IRelayDestination destinationContract,
 		bytes memory signature,
 		address signer,
-		address to,
-		uint value,
 		bytes memory data,
 		uint gasPriceLimit,
 		uint256 nonce
@@ -100,8 +96,6 @@ contract Forwarder is OwnersMap {
 
 		bytes32 _hash = hashTxMessage(
 			signer,
-			to,
-			value,
 			data,
 			nonce
 		);
@@ -113,9 +107,7 @@ contract Forwarder is OwnersMap {
 		);
 		require(checkAndUpdateNonce(signer, nonce), "Nonce is invalid");
 
-		destinationContract.relayExecute(
-			signer, to, value, data
-		);
+		destinationContract.relayExecute(signer, data);
 
 		uint256 endGas = gasleft();
 		uint256 forwardGasPrice = tx.gasprice < gasPriceLimit ? tx.gasprice : gasPriceLimit;
@@ -127,14 +119,10 @@ contract Forwarder is OwnersMap {
 
 	/// @dev Message to sign expected for relay transaction.
 	/// @param signer Signer of the signature.
-	/// @param to Destination address of internal transaction.
-	/// @param value Ether value of internal transaction.
 	/// @param data Data payload of internal transaction.
 	/// @param nonce Nonce of the internal transaction.
 	function hashTxMessage(
 		address signer,
-		address to,
-		uint value,
 		bytes memory data,
 		uint256 nonce
 	)
@@ -145,8 +133,6 @@ contract Forwarder is OwnersMap {
 		return keccak256(abi.encode(
 			TXMESSAGE_TYPEHASH,
 			signer,
-			to,
-			value,
 			keccak256(bytes(data)),
 			nonce
 		));

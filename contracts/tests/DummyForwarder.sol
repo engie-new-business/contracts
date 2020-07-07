@@ -51,8 +51,6 @@ contract DummyForwarder is OwnersMap {
 		IRelayDestination relayerContract,
 		address relayer,
 		address signer,
-		address to ,
-		uint value,
 		bytes memory data,
 		uint gasPrice
 	)
@@ -67,9 +65,7 @@ contract DummyForwarder is OwnersMap {
 
 		uint256 startGas = gasleft();
 
-		relayerContract.relayExecute(
-			signer, to, value, data
-		);
+		relayerContract.relayExecute(signer, data);
 
 		uint256 endGas = gasleft();
 		uint256 forwardGasPrice = gasPrice > tx.gasprice ? tx.gasprice : gasPrice;

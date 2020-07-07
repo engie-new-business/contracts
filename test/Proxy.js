@@ -96,22 +96,24 @@ contract('Proxy', (accounts) => {
     it('should forward a meta tx to an smart wallet', async () => {
       const signer = EOAs[1];
       const metatx = {
-        destination: '0x0000000000000000000000000000000000000000',
-        value: 0,
-        data: '0x',
+        data: buildSmartWalletData({
+          destination: '0x0000000000000000000000000000000000000000',
+          value: 0,
+          data: '0x',
+        }),
         gasLimit: 0,
         gasPrice: 1,
         nonce: await getNonceForChannel(forwarder, signer.address, 0),
       };
 
       const hash = await forwarder.hashTxMessage(
-        signer.address, metatx.destination, metatx.value, metatx.data, metatx.nonce
+        signer.address, metatx.data, metatx.nonce
       );
       const signature = await signMetaTx(forwarder.address, hash, signer);
 
       const res = await forwarder.forward(
         smartWallet.address, signature, signer.address,
-        metatx.destination, metatx.value, metatx.data, metatx.gasPrice,
+        metatx.data, metatx.gasPrice,
         metatx.nonce,
         { from: RELAYER }
       );
@@ -260,3 +262,6 @@ function getRandomNonce() {
   const nonce = BigInt(channel) * 2n**218n;
   return '0x' + nonce.toString(16);
 }
+
+const buildSmartWalletData = ({ destination, value, data }) =>
+  abi.rawEncode(['address', 'uint256', 'bytes'], destination, value, data);
