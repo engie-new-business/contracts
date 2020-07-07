@@ -107,7 +107,7 @@ contract('Proxy', (accounts) => {
       const hash = await forwarder.hashTxMessage(
         signer.address, metatx.destination, metatx.value, metatx.data, metatx.nonce
       );
-      const signature = await signMetaTx(smartWallet.address, hash, signer);
+      const signature = await signMetaTx(forwarder.address, hash, signer);
 
       const res = await forwarder.forward(
         smartWallet.address, signature, signer.address,

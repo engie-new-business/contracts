@@ -94,7 +94,7 @@ contract('Forwarder contract', (accounts) => {
     const chainID = await web3.eth.net.getId();
     const domain = {
       chainId: chainID,
-      verifyingContract: smartWalletContract.address,
+      verifyingContract: forwarderContract.address,
     };
 
     const hashBuf = new Buffer(hash.substring(2), 'hex');
