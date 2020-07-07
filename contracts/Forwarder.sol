@@ -20,6 +20,7 @@ contract Forwarder is OwnersMap {
 	bytes32 constant TXMESSAGE_TYPEHASH =
 		0xd3a5dbc47f098f34f663b1d3b74bd4df78ba7e6428e04914120023dfcd11b99b;
 
+	bytes32 eip712DomainSeparator;
 	mapping(address => mapping(uint128 => uint128)) public channels;
 
 	modifier isWhitelisted {
@@ -40,6 +41,13 @@ contract Forwarder is OwnersMap {
 		for(uint256 i = 0; i < _trustedContracts.length; i++) {
 			trustedContracts[_trustedContracts[i]] = true;
 		}
+
+		uint256 chainId;
+		// solhint-disable-next-line no-inline-assembly
+		assembly {
+			chainId := chainid()
+		}
+		eip712DomainSeparator = hashEIP712Domain(address(this), chainId);
 	}
 
 	function getNonce(address signer, uint128 channel) external view returns (uint128) {
@@ -98,15 +106,9 @@ contract Forwarder is OwnersMap {
 			nonce
 		);
 
-		uint256 id;
-		// solhint-disable-next-line no-inline-assembly
-		assembly {
-			id := chainid()
-		}
-		bytes32 domainSeparator = hashEIP712Domain(address(destinationContract), id);
 
 		require(
-			signerIsValid(_hash, signature, domainSeparator, signer),
+			signerIsValid(_hash, signature, eip712DomainSeparator, signer),
 			"Signer is not valid"
 		);
 		require(checkAndUpdateNonce(signer, nonce), "Nonce is invalid");
