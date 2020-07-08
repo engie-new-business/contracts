@@ -7,7 +7,7 @@ import "./ERC165/ERC165.sol";
 import "./IRelayDestination.sol";
 import "./ISmartWallet.sol";
 
-contract SmartWallet is OwnersMap, ISmartWallet, IRelayDestination, ERC165 {
+contract SmartWallet is OwnersMap, ISmartWallet, ERC165 {
 	using SafeMath for uint256;
 
 	mapping(bytes32 => bytes) store;
@@ -17,14 +17,14 @@ contract SmartWallet is OwnersMap, ISmartWallet, IRelayDestination, ERC165 {
 	event UpdateOwners(address account, bool value);
 
 	modifier onlyOwners() virtual {
-		require(owners[msg.sender], "Account not an owner");
+		require(owners[_msgSender()], "Account not an owner");
 		_;
 	}
 
 	address public authorizedForwarder;
 
 	bytes4 private constant _INTERFACE_ID_SMART_WALLET = 0xfb07fcd2;
-	bytes4 private constant _INTERFACE_ID_RELAYER = 0xd9fb9e4a;
+	bytes4 private constant _INTERFACE_ID_RELAY_DESTINATION = 0xd9fb9e4a;
 
 	event RelayedExecute (bool success);
 
@@ -42,12 +42,12 @@ contract SmartWallet is OwnersMap, ISmartWallet, IRelayDestination, ERC165 {
 
 		authorizedForwarder = forwarder;
 		_registerInterface(_INTERFACE_ID_SMART_WALLET);
-		_registerInterface(_INTERFACE_ID_RELAYER);
+		_registerInterface(_INTERFACE_ID_RELAY_DESTINATION);
 	}
 
 	/// @dev Fallback function for receiving Ether, emit an event.
 	receive() external virtual payable {
-		emit Received(msg.sender, msg.value);
+		emit Received(_msgSender(), msg.value);
 	}
 
 	/// @dev Execute a call if the sender is an owner.
@@ -174,8 +174,8 @@ contract SmartWallet is OwnersMap, ISmartWallet, IRelayDestination, ERC165 {
 		bytes32 salt,
 		bytes memory bytecode
 	)
-		internal
-		returns (address addr)
+	internal
+	returns (address addr)
 	{
 		// solhint-disable-next-line no-inline-assembly
 		assembly {
@@ -183,36 +183,13 @@ contract SmartWallet is OwnersMap, ISmartWallet, IRelayDestination, ERC165 {
 		}
 	}
 
-	/// @dev Execute a transaction sent by the authorized forwarder.
-	/// @param signer Signer of the signature received by the forwarder.
-	/// @param to Destination address of internal transaction .
-	/// @param value Ether value of internal transaction.
-	/// @param data Data payload of internal transaction.
-	function relayExecute(
-		address signer,
-		address to,
-		uint value,
-		bytes memory data
-	)
-		public
-		override
-	{
-		require(
-			msg.sender == authorizedForwarder,
-			"Sender is not the authorized forwarder"
-		);
-
-		require(
-			owners[signer],
-			"Signer is not owner"
-		);
-
-		bool success = executeCall(
-			gasleft(),
-			to,
-			value,
-			data
-		);
-		emit RelayedExecute(success);
+	function _msgSender() internal view returns (address ret) {
+		address sender = msg.sender;
+		if (msg.data.length >= 24 && msg.sender == authorizedForwarder) {
+			assembly {
+				sender := shr(96,calldataload(sub(calldatasize(),20)))
+			}
+		}
+		return sender;
 	}
 }
