@@ -7,7 +7,7 @@ import "./ERC165/ERC165.sol";
 import "./IRelayDestination.sol";
 import "./ISmartWallet.sol";
 
-contract SmartWallet is OwnersMap, ISmartWallet, IRelayDestination, ERC165 {
+contract SmartWallet is OwnersMap, ISmartWallet, ERC165 {
 	using SafeMath for uint256;
 
 	mapping(bytes32 => bytes) store;
@@ -17,7 +17,7 @@ contract SmartWallet is OwnersMap, ISmartWallet, IRelayDestination, ERC165 {
 	event UpdateOwners(address account, bool value);
 
 	modifier onlyOwners() virtual {
-		require(owners[msg.sender], "Account not an owner");
+		require(owners[_msgSender()], "Account not an owner");
 		_;
 	}
 
@@ -47,7 +47,7 @@ contract SmartWallet is OwnersMap, ISmartWallet, IRelayDestination, ERC165 {
 
 	/// @dev Fallback function for receiving Ether, emit an event.
 	receive() external virtual payable {
-		emit Received(msg.sender, msg.value);
+		emit Received(_msgSender(), msg.value);
 	}
 
 	/// @dev Execute a call if the sender is an owner.
@@ -174,8 +174,8 @@ contract SmartWallet is OwnersMap, ISmartWallet, IRelayDestination, ERC165 {
 		bytes32 salt,
 		bytes memory bytecode
 	)
-		internal
-		returns (address addr)
+	internal
+	returns (address addr)
 	{
 		// solhint-disable-next-line no-inline-assembly
 		assembly {
@@ -183,28 +183,13 @@ contract SmartWallet is OwnersMap, ISmartWallet, IRelayDestination, ERC165 {
 		}
 	}
 
-	/// @dev Execute a transaction sent by the authorized forwarder.
-	/// @param signer Signer of the parameters
-	/// @param data Data payload of internal transaction. Signer of the transaction is appended to data
-	function relayExecute(
-		address signer,
-		bytes memory data
-	)
-		public
-		override
-	{
-		require(
-			owners[signer],
-			"Signer is not owner"
-		);
-
-		(address to, uint256 value, bytes memory innerData) = abi.decode(data, (address,uint256,bytes));
-		bool success = executeCall(
-			gasleft(),
-			to,
-			value,
-			innerData
-		);
-		emit RelayedExecute(success);
+	function _msgSender() internal view returns (address ret) {
+		address sender = msg.sender;
+		if (msg.data.length >= 24 && msg.sender == authorizedForwarder) {
+			assembly {
+				sender := shr(96,calldataload(sub(calldatasize(),20)))
+			}
+		}
+		return sender;
 	}
 }

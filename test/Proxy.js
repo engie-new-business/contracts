@@ -96,24 +96,21 @@ contract('Proxy', (accounts) => {
     it('should forward a meta tx to an smart wallet', async () => {
       const signer = EOAs[1];
       const metatx = {
-        data: buildSmartWalletData({
-          destination: '0x0000000000000000000000000000000000000000',
-          value: 0,
-          data: '0x',
-        }),
+        to: proxySmartWallet.address,
+        data: smartWalletContract.contract.methods.execute('0x0000000000000000000000000000000000000000', '0x0', '0x').encodeABI(),
         gasLimit: 0,
         gasPrice: 1,
         nonce: await getNonceForChannel(forwarder, signer.address, 0),
       };
 
       const hash = await forwarder.hashTxMessage(
-        signer.address, metatx.data, metatx.nonce
+        signer.address, metatx.to, metatx.data, metatx.nonce
       );
       const signature = await signMetaTx(forwarder.address, hash, signer);
 
       const res = await forwarder.forward(
-        smartWallet.address, signature, signer.address,
-        metatx.data, metatx.gasPrice,
+        signature, signer.address,
+        metatx.to, metatx.data, metatx.gasPrice,
         metatx.nonce,
         { from: RELAYER }
       );

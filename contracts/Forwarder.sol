@@ -16,9 +16,9 @@ contract Forwarder is OwnersMap {
 	bytes32 constant EIP712DOMAIN_TYPEHASH =
 		0xa1f4e2f207746c24e01c8e10e467322f5fea4cccab3cd2f1c95d700b6a0c218b;
 
-	// keccak256("TxMessage(address signer,bytes data,uint256 nonce)")
+	// TxMessage(address signer,address to,bytes data,uint256 nonce)
 	bytes32 constant TXMESSAGE_TYPEHASH =
-		0x4a5440ef85933790132a0c37df00d9107524b193e1d52ee4fab75c228cece86e;
+		0x5d3fdf13ba0a9438136f3f1e14d979bd76392edb80432892f8758dbeee524292;
 
 	bytes32 eip712DomainSeparator;
 	mapping(address => mapping(uint128 => uint128)) public channels;
@@ -69,17 +69,16 @@ contract Forwarder is OwnersMap {
 
 	receive() external payable { }
 
-	/// @dev Forwards a meta transaction to a destination contract that implements IRelayDestination interface.
-	/// @param destinationContract Address of the destination contract that must execute the transaction
+	/// @dev Forwards a meta transaction to a destination contract
 	/// @param signature Signature by the signer of the other params.
 	/// @param signer Signer of the signature.
 	/// @param data Data payload of internal transaction.
 	/// @param gasPriceLimit Gas price limit that the signer agreed to pay.
 	/// @param nonce Nonce of the internal transaction.
 	function forward(
-		IRelayDestination destinationContract,
 		bytes memory signature,
 		address signer,
+		address to,
 		bytes memory data,
 		uint gasPriceLimit,
 		uint256 nonce
@@ -88,7 +87,7 @@ contract Forwarder is OwnersMap {
 		public
 	{
 		require(
-			!hasTrustedContracts || trustedContracts[address(destinationContract)],
+			!hasTrustedContracts || trustedContracts[address(to)],
 			"Unauthorized destination"
 		);
 
@@ -96,6 +95,7 @@ contract Forwarder is OwnersMap {
 
 		bytes32 _hash = hashTxMessage(
 			signer,
+			to,
 			data,
 			nonce
 		);
@@ -107,7 +107,8 @@ contract Forwarder is OwnersMap {
 		);
 		require(checkAndUpdateNonce(signer, nonce), "Nonce is invalid");
 
-		destinationContract.relayExecute(signer, data);
+		(bool success,) = to.call(abi.encodePacked(data, signer));
+		require(success);
 
 		uint256 endGas = gasleft();
 		uint256 forwardGasPrice = tx.gasprice < gasPriceLimit ? tx.gasprice : gasPriceLimit;
@@ -119,10 +120,12 @@ contract Forwarder is OwnersMap {
 
 	/// @dev Message to sign expected for relay transaction.
 	/// @param signer Signer of the signature.
+	/// @param to Address of the destination
 	/// @param data Data payload of internal transaction.
 	/// @param nonce Nonce of the internal transaction.
 	function hashTxMessage(
 		address signer,
+		address to,
 		bytes memory data,
 		uint256 nonce
 	)
@@ -133,6 +136,7 @@ contract Forwarder is OwnersMap {
 		return keccak256(abi.encode(
 			TXMESSAGE_TYPEHASH,
 			signer,
+			to,
 			keccak256(bytes(data)),
 			nonce
 		));

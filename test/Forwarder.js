@@ -35,14 +35,9 @@ contract('Forwarder contract', (accounts) => {
   it('should forward a meta tx to a smart wallet', async () => {
     const signer = EOAs[0];
 
-    const data = buildSmartWalletData({
-      destination: '0x0000000000000000000000000000000000000000',
-      value: '0x0',
-      data: '0x',
-    });
-
     const metatx = {
-      data,
+      destination: smartWalletContract.address,
+      data: smartWalletContract.contract.methods.execute('0x0000000000000000000000000000000000000000', '0x0', '0x').encodeABI(),
       gasPrice: 1,
       nonce: await getNonceForChannel(signer.address, 0),
     };
@@ -54,7 +49,7 @@ contract('Forwarder contract', (accounts) => {
     });
 
     const res = await forwarderContract.forward(
-      smartWalletContract.address, signature, signer.address,
+      signature, signer.address, metatx.destination,
       metatx.data, metatx.gasPrice,
       metatx.nonce,
       { from: RELAYER }
@@ -64,8 +59,10 @@ contract('Forwarder contract', (accounts) => {
   it('should not allow invalid destination', async () => {
     const forwarderContract = await Forwarder.new(authorizedRelayersContract.address, ['0x0000000000000000000000000000000000000001'], { from: RELAYER });
     const signer = EOAs[0];
+
     const metatx = {
-      data: '0x',
+      destination: smartWalletContract.address,
+      data: smartWalletContract.contract.methods.execute('0x0000000000000000000000000000000000000000', '0x0', '0x').encodeABI(),
       gasPrice: 1,
       nonce: await getNonceForChannel(signer.address, 0),
     };
@@ -78,8 +75,8 @@ contract('Forwarder contract', (accounts) => {
 
     try {
       const res = await forwarderContract.forward(
-        "0x0000000000000000000000000000000000000000", signature, signer.address,
-        metatx.data, metatx.gasPrice, metatx.nonce,
+        signature, signer.address,
+        metatx.destination, metatx.data, metatx.gasPrice, metatx.nonce,
         { from: RELAYER }
       );
       assert.isTrue(false);
@@ -93,7 +90,7 @@ contract('Forwarder contract', (accounts) => {
 
   const signMetaTx = async ({ signer, destination, value, data, nonce }) => {
     const hash = await forwarderContract.hashTxMessage(
-      signer.address, data, nonce
+      signer.address, destination, data, nonce
     );
 
     const chainID = await web3.eth.net.getId();
