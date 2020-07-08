@@ -26,7 +26,8 @@ contract SmartWallet is OwnersMap, ISmartWallet, ERC165 {
 	bytes4 private constant _INTERFACE_ID_SMART_WALLET = 0xfb07fcd2;
 	bytes4 private constant _INTERFACE_ID_RELAY_DESTINATION = 0xd9fb9e4a;
 
-	event RelayedExecute (bool success);
+	event Executed(address indexed to, uint256 value);
+	event Deployed(address addr);
 
 	/// @dev Whitelist the owner and the contract itself.
 	/// @param owner Address of the owner.
@@ -63,6 +64,7 @@ contract SmartWallet is OwnersMap, ISmartWallet, ERC165 {
 			executeCall(gasleft(), to, value, data),
 			"call failed"
 		);
+		emit Executed(to, value);
 	}
 
 	/// @dev Execute a deploy call if the sender is an owner.
@@ -77,6 +79,7 @@ contract SmartWallet is OwnersMap, ISmartWallet, ERC165 {
 	{
 		address addr = executeCreate2(value, salt, initCode);
 		require(addr != address(0x0), "create2 failed");
+		emit Deployed(addr);
 		return addr;
 	}
 
