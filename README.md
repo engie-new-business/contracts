@@ -24,20 +24,17 @@ npm install
 
 ## Test
 
+We have an unknown issue with `ganache-cli` (probably related to EIP712 signature), you must use [geth](https://geth.ethereum.org/docs/install-and-build/installing-geth) as blockchain
+
+```
+geth --dev --datadir temp --rpc
+```
+
 Run truffle test
 
 ```
 truffle test
 ```
-
-You can choose the provider in `truffle-config.js`. Remove `development` to test with default ganache encapsulated by truffle.
-
-You can test with a dev geth node by lanching it with
-
-```
-geth --dev --datadir temp --rpc console
-```
-
 
 ## License
 
