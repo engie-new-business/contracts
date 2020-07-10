@@ -67,6 +67,13 @@ contract Forwarder is OwnersMap {
 		relayers = AuthorizedRelayers(relayersAddress);
 	}
 
+	/// @dev Owners of this Forwarder can withdraw funds
+	function withdraw(uint amount) public returns (bool) {
+		require(owners[msg.sender], "Sender is not an owner");
+		require(amount <= address(this).balance);
+		return msg.sender.send(amount);
+	}
+
 	receive() external payable { }
 
 	/// @dev Forwards a meta transaction to a destination contract
