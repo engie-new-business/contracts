@@ -1,6 +1,5 @@
 pragma solidity >=0.6.0 <0.7.0;
 
-import "../IRelayDestination.sol";
 import "../SafeMath.sol";
 import "../AuthorizedRelayers.sol";
 import "../OwnersMap.sol";
@@ -45,33 +44,5 @@ contract DummyForwarder is OwnersMap {
 
 	function dummyFunction() public pure returns (string memory) {
 		return "dummy";
-	}
-
-	function forward(
-		IRelayDestination relayerContract,
-		address relayer,
-		address signer,
-		bytes memory data,
-		uint gasPrice
-	)
-	isWhitelisted
-	public
-	{
-		require(
-			relayer == msg.sender || relayer == address(0),
-			"Invalid relayer"
-		);
-		require(trustedContracts[address(relayerContract)], "Unauthorized destination");
-
-		uint256 startGas = gasleft();
-
-		relayerContract.relayExecute(signer, data);
-
-		uint256 endGas = gasleft();
-		uint256 forwardGasPrice = gasPrice > tx.gasprice ? tx.gasprice : gasPrice;
-		uint256 consumedGas = startGas.sub(endGas);
-		uint256 payment = forwardGasPrice * consumedGas;
-
-		require(msg.sender.send(payment), "Could not pay relayer gas costs with ether");
 	}
 }

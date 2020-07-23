@@ -24,7 +24,7 @@ npm install
 
 ## Test
 
-We have an unknown issue with `ganache-cli` (probably related to EIP712 signature), you must use [geth](https://geth.ethereum.org/docs/install-and-build/installing-geth) as blockchain
+We have a known issue with `ganache-cli` `ecrecover` ([more details](https://docs.kaleido.io/faqs/why-ecrecover-fails/)), you must use [geth](https://geth.ethereum.org/docs/install-and-build/installing-geth) as blockchain
 
 ```
 geth --dev --datadir temp --rpc

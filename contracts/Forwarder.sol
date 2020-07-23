@@ -106,7 +106,6 @@ contract Forwarder is OwnersMap {
 			nonce
 		);
 
-
 		require(
 			signerIsValid(_hash, signature, eip712DomainSeparator, signer),
 			"Signer is not valid"

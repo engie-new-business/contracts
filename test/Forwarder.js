@@ -81,7 +81,11 @@ contract('Forwarder contract', (accounts) => {
       );
       assert.isTrue(false);
     } catch (e) {
-      assert.equal('Account not an owner', e.reason);
+      if (e.reason != undefined) {
+        assert.equal('Account not an owner', e.reason);
+      } else {
+        assert.include(e.message, 'exited with an error (status 0)');
+      }
     }
   });
 

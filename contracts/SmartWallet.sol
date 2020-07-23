@@ -4,7 +4,6 @@ pragma experimental ABIEncoderV2;
 import "./OwnersMap.sol";
 import "./SafeMath.sol";
 import "./ERC165/ERC165.sol";
-import "./IRelayDestination.sol";
 import "./ISmartWallet.sol";
 
 contract SmartWallet is OwnersMap, ISmartWallet, ERC165 {
