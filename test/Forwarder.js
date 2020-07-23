@@ -56,6 +56,36 @@ contract('Forwarder contract', (accounts) => {
     );
   });
 
+  it('should not allow to forward a meta tx to a smart wallet that is not owned by the signer', async () => {
+    const signer = EOAs[1];
+
+    const metatx = {
+      destination: smartWalletContract.address,
+      data: smartWalletContract.contract.methods.execute('0x0000000000000000000000000000000000000000', '0x0', '0x').encodeABI(),
+      gasPrice: 1,
+      nonce: await getNonceForChannel(signer.address, 0),
+    };
+
+    const signature = await signMetaTx({
+      ...metatx,
+      signer,
+      relayer: RELAYER,
+    });
+
+    try {
+      await forwarderContract.forward(
+        signature, signer.address, metatx.destination,
+        metatx.data, metatx.gasPrice,
+        metatx.nonce,
+        { from: RELAYER }
+      );
+      assert.isTrue(false);
+    } catch (e) {
+      assert.equal('Account not an owner', e.reason);
+    }
+  });
+
+
   it('should not allow invalid destination', async () => {
     const forwarderContract = await Forwarder.new(authorizedRelayersContract.address, ['0x0000000000000000000000000000000000000001'], { from: RELAYER });
     const signer = EOAs[0];

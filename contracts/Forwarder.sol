@@ -1,6 +1,5 @@
 pragma solidity >=0.6.0 <0.7.0;
 
-import "./IRelayDestination.sol";
 import "./SafeMath.sol";
 import "./AuthorizedRelayers.sol";
 import "./OwnersMap.sol";
@@ -115,7 +114,12 @@ contract Forwarder is OwnersMap {
 		require(checkAndUpdateNonce(signer, nonce), "Nonce is invalid");
 
 		(bool success,) = to.call(abi.encodePacked(data, signer));
-		require(success);
+		if (!success) {
+			assembly {
+				returndatacopy(0, 0, returndatasize())
+				revert(0, returndatasize())
+			}
+		}
 
 		uint256 endGas = gasleft();
 		uint256 forwardGasPrice = tx.gasprice < gasPriceLimit ? tx.gasprice : gasPriceLimit;
