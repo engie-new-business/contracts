@@ -25,6 +25,9 @@ contract Forwarder is Implementation, OwnersMap {
 	bytes32 eip712DomainSeparator;
 	mapping(address => mapping(uint128 => uint128)) public channels;
 
+	event UpdateOwners(address account, bool value);
+
+	event Forwarded(address indexed signer, address indexed to, uint256 gasUsed);
 
 	modifier isWhitelisted {
 		require(relayers.verify(msg.sender), "Invalid sender");
@@ -57,6 +60,20 @@ contract Forwarder is Implementation, OwnersMap {
 
 	function getNonce(address signer, uint128 channel) external view returns (uint128) {
 		return channels[signer][channel];
+	}
+
+	/// @dev Add or remove an address from the owners
+	/// @param account Address to change.
+	/// @param value Action to do (true to add and false to remove).
+	function updateOwners(address account, bool value)
+		public
+		returns(bool)
+	{
+		require(owners[msg.sender], "Sender is not an owner");
+
+		owners[account] = value;
+		emit UpdateOwners(account, value);
+		return true;
 	}
 
 	function updateTrustedContracts(address[] memory contracts) public {
@@ -131,6 +148,8 @@ contract Forwarder is Implementation, OwnersMap {
 		uint256 forwardGasPrice = tx.gasprice < gasPriceLimit ? tx.gasprice : gasPriceLimit;
 		uint256 consumedGas = startGas.sub(endGas);
 		uint256 payment = forwardGasPrice * consumedGas;
+
+		emit Forwarded(signer, to, consumedGas);
 
 		require(msg.sender.send(payment), "Could not refund gas to relayer");
 	}
