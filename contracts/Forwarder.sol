@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.6.0 <0.7.0;
 
 import "./SafeMath.sol";
@@ -6,6 +7,7 @@ import "./OwnersMap.sol";
 
 contract Forwarder is OwnersMap {
 	using SafeMath for uint256;
+
 	AuthorizedRelayers public relayers;
 	mapping(address => bool) public trustedContracts;
 	bool internal hasTrustedContracts;
@@ -28,6 +30,7 @@ contract Forwarder is OwnersMap {
 	}
 
 	constructor(address relayersAddress, address[] memory _trustedContracts) public {
+		owners[msg.sender] = true;
 		initialize(relayersAddress, _trustedContracts);
 	}
 
@@ -67,10 +70,10 @@ contract Forwarder is OwnersMap {
 	}
 
 	/// @dev Owners of this Forwarder can withdraw funds
-	function withdraw(uint amount) public returns (bool) {
+	function withdraw(uint amount) public {
 		require(owners[msg.sender], "Sender is not an owner");
-		require(amount <= address(this).balance);
-		return msg.sender.send(amount);
+		require(amount <= address(this).balance, "Amount is too high");
+		msg.sender.transfer(amount);
 	}
 
 	receive() external payable { }
