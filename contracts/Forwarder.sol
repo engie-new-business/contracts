@@ -81,6 +81,7 @@ contract Forwarder is OwnersMap {
 	/// @dev Forwards a meta transaction to a destination contract
 	/// @param signature Signature by the signer of the other params.
 	/// @param signer Signer of the signature.
+	/// @param to The the internal transaction destination.
 	/// @param data Data payload of internal transaction.
 	/// @param gasPriceLimit Gas price limit that the signer agreed to pay.
 	/// @param nonce Nonce of the internal transaction.
@@ -129,6 +130,62 @@ contract Forwarder is OwnersMap {
 		uint256 payment = forwardGasPrice * consumedGas;
 
 		require(msg.sender.send(payment), "Could not refund gas to relayer");
+	}
+
+	/// @dev Estimate the gas require for forwading a meta transaction
+	///      This method is only meant for estimation purpose, therefore two different protection mechanism against execution in a transaction have been made:
+    ///      1.) The method can only be called from the safe itself
+    ///      2.) The response is returned with a revert
+	/// @param signature Signature by the signer of the other params.
+	/// @param signer Signer of the signature.
+	/// @param to The the internal transaction destination.
+	/// @param data Data payload of internal transaction.
+	/// @param gasPriceLimit Gas price limit that the signer agreed to pay.
+	/// @param nonce Nonce of the internal transaction.
+	function estimateForward(
+		bytes calldata signature,
+		address signer,
+		address to,
+		bytes calldata data,
+		uint gasPriceLimit,
+		uint256 nonce
+	)
+		external
+	{
+	    require(msg.sender == address(this));
+		require(
+			!hasTrustedContracts || trustedContracts[address(to)],
+			"Unauthorized destination"
+		);
+
+		uint256 startGas = gasleft();
+
+		bytes32 _hash = hashTxMessage(
+			signer,
+			to,
+			data,
+			nonce
+		);
+
+		require(
+			signerIsValid(_hash, signature, eip712DomainSeparator, signer),
+			"Signer is not valid"
+		);
+
+		// check the nonce but don't revert if invalid
+		checkAndUpdateNonce(signer, nonce);
+
+		(bool success,) = to.call(abi.encodePacked(data, signer));
+		require(success);
+
+		uint256 endGas = gasleft();
+		uint256 forwardGasPrice = tx.gasprice < gasPriceLimit ? tx.gasprice : gasPriceLimit;
+		uint256 consumedGas = startGas.sub(endGas);
+		uint256 payment = forwardGasPrice * consumedGas;
+
+		require(msg.sender.send(payment), "Could not refund gas to relayer");
+
+		revert(string(abi.encodePacked(consumedGas)));
 	}
 
 	/// @dev Message to sign expected for relay transaction.

@@ -32,7 +32,7 @@ contract('Forwarder contract', (accounts) => {
     });
   });
 
-  it('should forward a meta tx to a smart wallet', async () => {
+  it('should forward a meta tx to a smartwallet', async () => {
     const signer = EOAs[0];
 
     const metatx = {
@@ -48,12 +48,72 @@ contract('Forwarder contract', (accounts) => {
       relayer: RELAYER,
     });
 
+    const estimation = await forwarderContract.contract.methods.estimateForward(
+      signature, signer.address, metatx.destination,
+      metatx.data, metatx.gasPrice,
+      metatx.nonce
+    ).estimateGas({ from: forwarderContract.address, gasPrice: 1 })
+
     const res = await forwarderContract.forward(
       signature, signer.address, metatx.destination,
       metatx.data, metatx.gasPrice,
       metatx.nonce,
       { from: RELAYER }
     );
+
+    assert.ok(estimation + 5000 > res.receipt.cumulativeGasUsed);
+  });
+
+  it('should estimate meta tx with invalid nonce', async () => {
+    const signer = EOAs[0];
+
+    const futurMetatx = {
+      destination: smartWalletContract.address,
+      data: smartWalletContract.contract.methods.execute('0x0000000000000000000000000000000000000000', '0x0', '0x').encodeABI(),
+      gasPrice: 1,
+      nonce: '0x' + (new Number(await getNonceForChannel(signer.address, 0)) + 1).toString(16),
+    };
+
+    const futurSignature = await signMetaTx({
+      ...futurMetatx,
+      signer,
+      relayer: RELAYER,
+    });
+
+    const estimation = await forwarderContract.contract.methods.estimateForward(
+      futurSignature, signer.address, futurMetatx.destination,
+      futurMetatx.data, futurMetatx.gasPrice,
+      futurMetatx.nonce
+    ).estimateGas({ from: forwarderContract.address, gasPrice: 10 })
+
+    const metatx = {
+      destination: smartWalletContract.address,
+      data: smartWalletContract.contract.methods.execute('0x0000000000000000000000000000000000000000', '0x0', '0x').encodeABI(),
+      gasPrice: 1,
+      nonce: await getNonceForChannel(signer.address, 0),
+    };
+
+    const signature = await signMetaTx({
+      ...metatx,
+      signer,
+      relayer: RELAYER,
+    });
+
+    const res1 = await forwarderContract.forward(
+      signature, signer.address, metatx.destination,
+      metatx.data, metatx.gasPrice,
+      metatx.nonce,
+      { from: RELAYER }
+    );
+
+    const res2 = await forwarderContract.forward(
+      futurSignature, signer.address, futurMetatx.destination,
+      futurMetatx.data, futurMetatx.gasPrice,
+      futurMetatx.nonce,
+      { from: RELAYER }
+    );
+
+    assert.ok(estimation + 10000 > res2.receipt.cumulativeGasUsed);
   });
 
   it('should not allow to forward a meta tx to a smart wallet that is not owned by the signer', async () => {
