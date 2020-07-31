@@ -116,6 +116,34 @@ contract('Proxy', (accounts) => {
       );
     });
 
+    it('should not be possible to send transaction to estimateForward', async () => {
+      const signer = EOAs[1];
+      const metatx = {
+        to: proxySmartWallet.address,
+        data: smartWalletContract.contract.methods.execute('0x0000000000000000000000000000000000000000', '0x0', '0x').encodeABI(),
+        gasLimit: 0,
+        gasPrice: 1,
+        nonce: await getNonceForChannel(forwarder, signer.address, 0),
+      };
+
+      const hash = await forwarder.hashTxMessage(
+        signer.address, metatx.to, metatx.data, metatx.nonce
+      );
+      const signature = await signMetaTx(forwarder.address, hash, signer);
+
+      try {
+        const res = await forwarder.estimateForward(
+          signature, signer.address,
+          metatx.to, metatx.data, metatx.gasPrice,
+          metatx.nonce,
+          { from: RELAYER }
+        );
+        assert.ok(false);
+      } catch (e) {
+        assert.ok(true);
+      }
+    });
+
     it('should change implementation', async () => {
       const signer = EOAs[1];
 
