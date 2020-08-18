@@ -3,11 +3,12 @@ pragma solidity >=0.6.0 <0.7.0;
 pragma experimental ABIEncoderV2;
 
 import "./OwnersMap.sol";
+import "./Implementation.sol";
 import "./SafeMath.sol";
 import "./ERC165/ERC165.sol";
 import "./ISmartWallet.sol";
 
-contract SmartWallet is OwnersMap, ISmartWallet, ERC165 {
+contract SmartWallet is Implementation, OwnersMap, ISmartWallet, ERC165 {
 	using SafeMath for uint256;
 
 	mapping(bytes32 => bytes) store;
@@ -32,14 +33,15 @@ contract SmartWallet is OwnersMap, ISmartWallet, ERC165 {
 	/// @dev Whitelist the owner and the contract itself.
 	/// @param owner Address of the owner.
 	constructor(address owner, address forwarder) public {
-		owners[owner] = true;
-		owners[address(this)] = true;
-		initialize(forwarder);
+		initialize(owner, forwarder);
 	}
 
-	function initialize(address forwarder) public {
+	function initialize(address owner, address forwarder) public {
 		require(!initialized, "Contract already initialized");
 		initialized = true;
+
+		owners[owner] = true;
+		owners[address(this)] = true;
 
 		authorizedForwarder = forwarder;
 		_registerInterface(_INTERFACE_ID_SMART_WALLET);
@@ -49,6 +51,10 @@ contract SmartWallet is OwnersMap, ISmartWallet, ERC165 {
 	/// @dev Fallback function for receiving Ether, emit an event.
 	receive() external virtual payable {
 		emit Received(_msgSender(), msg.value);
+	}
+
+	function upgradeTo(address newImplementation) onlyOwners public {
+		updateImplementation(newImplementation);
 	}
 
 	/// @dev Execute a call if the sender is an owner.

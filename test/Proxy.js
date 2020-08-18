@@ -36,7 +36,7 @@ contract('Proxy', (accounts) => {
   describe('ProxyFactory', async () => {
     it('should have transfert the value to the proxy at creation with nonce', async () => {
       const res = await proxyFactoryContract.createProxyWithNonce(
-        RELAYER, web3.utils.utf8ToHex("v0"), "0x0000000000000000000000000000000000000000", "0x", getRandomNonce(),
+        "0x0000000000000000000000000000000000000000", "0x", getRandomNonce(),
         { from: RELAYER, value: 1 }
       );
       let address
@@ -51,7 +51,7 @@ contract('Proxy', (accounts) => {
 
     it('should have transfert the value to the proxy at creation', async () => {
       const res = await proxyFactoryContract.createProxy(
-        RELAYER, web3.utils.utf8ToHex("v0"), "0x0000000000000000000000000000000000000000", "0x",
+        "0x0000000000000000000000000000000000000000", "0x",
         { from: RELAYER, value: 1 }
       );
       let address
@@ -70,10 +70,10 @@ contract('Proxy', (accounts) => {
     let forwarder;
     let smartWallet;
 
-    before(async () => {
-      proxyForwarder = await deployProxy(EOAs[1].address, web3.utils.utf8ToHex("v0"), forwarderContract.address, forwarderContract.contract.methods.initialize(authorizedRelayersContract.address, []).encodeABI(), { from: RELAYER });
+    beforeEach(async () => {
+      proxyForwarder = await deployProxy(forwarderContract.address, forwarderContract.contract.methods.initialize(EOAs[1].address, authorizedRelayersContract.address, []).encodeABI(), { from: RELAYER });
       forwarder = await Forwarder.at(proxyForwarder.address)
-      proxySmartWallet = await deployProxy(EOAs[1].address, web3.utils.utf8ToHex("v0"), smartWalletContract.address, smartWalletContract.contract.methods.initialize(forwarder.address).encodeABI(), { from: RELAYER });
+      proxySmartWallet = await deployProxy(smartWalletContract.address, smartWalletContract.contract.methods.initialize(EOAs[1].address, forwarder.address).encodeABI(), { from: RELAYER });
       smartWallet = await SmartWallet.at(proxySmartWallet.address)
 
       await web3.eth.sendTransaction({
@@ -88,8 +88,7 @@ contract('Proxy', (accounts) => {
       });
     });
 
-    it('should have a version and implementation', async () => {
-      assert.equal(web3.utils.hexToUtf8(await proxyForwarder.version()), "v0")
+    it('should have an implementation', async () => {
       assert.equal(await proxyForwarder.implementation(), forwarderContract.address)
     });
 
@@ -150,19 +149,17 @@ contract('Proxy', (accounts) => {
       let tx = await signer.signTransaction({
         from: signer.address,
         to: proxyForwarder.address,
-        value: '0',
+        value: 0,
         gas: 300000,
         gasPrice: 0,
-        data: await proxyForwarder.contract.methods.upgradeTo(web3.utils.utf8ToHex("v2"), dummyForwarderContract.address).encodeABI(),
+        data: await forwarder.contract.methods.upgradeTo(dummyForwarderContract.address).encodeABI(),
       })
 
-      try {
-        await web3.eth.sendSignedTransaction(tx.rawTransaction)
-        forwarder = await DummyForwarder.at(proxyForwarder.address)
-        assert.equal(await forwarder.dummyFunction(), "dummy")
-      } catch (e) {
-        assert.fail("got know error")
-      }
+      const result = await web3.eth.sendSignedTransaction(tx.rawTransaction)
+
+      forwarder = await DummyForwarder.at(proxyForwarder.address)
+      assert.equal(await forwarder.implementation(), dummyForwarderContract.address)
+      assert.equal(await forwarder.dummyFunction(), "dummy")
     })
   });
 
@@ -196,8 +193,8 @@ contract('Proxy', (accounts) => {
     return '0x' + nonceValue.toString(16)
   }
 
-  const deployProxy = async (owner, version, implementation, data) => {
-    const res = await proxyFactoryContract.createProxyWithNonce(owner, version, implementation, data, getRandomNonce(), { from: RELAYER });
+  const deployProxy = async (implementation, data) => {
+    const res = await proxyFactoryContract.createProxyWithNonce(implementation, data, getRandomNonce(), { from: RELAYER });
     let address
     for (var i = 0; i < res.logs.length; i++) {
       if (res.logs[i].event == 'ProxyCreation') {
