@@ -2,11 +2,13 @@
 pragma solidity >=0.6.0 <0.7.0;
 
 import "../SafeMath.sol";
+import "../Implementation.sol";
 import "../AuthorizedRelayers.sol";
 import "../OwnersMap.sol";
 
-contract DummyForwarder is OwnersMap {
+contract DummyForwarder is Implementation, OwnersMap {
 	using SafeMath for uint256;
+
 	AuthorizedRelayers public relayers;
 	mapping(address => bool) public trustedContracts;
 	bool public initialized;

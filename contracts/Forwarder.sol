@@ -2,10 +2,11 @@
 pragma solidity >=0.6.0 <0.7.0;
 
 import "./SafeMath.sol";
+import "./Implementation.sol";
 import "./AuthorizedRelayers.sol";
 import "./OwnersMap.sol";
 
-contract Forwarder is OwnersMap {
+contract Forwarder is Implementation, OwnersMap {
 	using SafeMath for uint256;
 
 	AuthorizedRelayers public relayers;
@@ -24,19 +25,21 @@ contract Forwarder is OwnersMap {
 	bytes32 eip712DomainSeparator;
 	mapping(address => mapping(uint128 => uint128)) public channels;
 
+
 	modifier isWhitelisted {
 		require(relayers.verify(msg.sender), "Invalid sender");
 		_;
 	}
 
 	constructor(address relayersAddress, address[] memory _trustedContracts) public {
-		owners[msg.sender] = true;
-		initialize(relayersAddress, _trustedContracts);
+		initialize(msg.sender, relayersAddress, _trustedContracts);
 	}
 
-	function initialize(address relayersAddress, address[] memory _trustedContracts) public {
+	function initialize(address owner, address relayersAddress, address[] memory _trustedContracts) public {
 		require(!initialized, "Contract already initialized");
 		initialized = true;
+
+		owners[owner] = true;
 
 		relayers = AuthorizedRelayers(relayersAddress);
 		hasTrustedContracts = _trustedContracts.length > 0;
@@ -228,6 +231,11 @@ contract Forwarder is OwnersMap {
 			return true;
 		}
 		return false;
+	}
+
+	function upgradeTo(address newImplementation) public {
+		require(owners[msg.sender], "Sender is not an owner");
+		updateImplementation(newImplementation);
 	}
 
 	/// @dev Find the signer of signature and check if he is an owner.
