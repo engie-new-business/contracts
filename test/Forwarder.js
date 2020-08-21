@@ -1,296 +1,446 @@
-const ethUtil = require('ethereumjs-util');
-const abi = require('ethereumjs-abi');
+const { assertRevertWith } = require('./utils');
+const { signMetaTx, getNonce } = require('./metatx');
 
 const AuthorizedRelayers = artifacts.require("AuthorizedRelayers");
 const Forwarder = artifacts.require("Forwarder");
 const SmartWallet = artifacts.require("SmartWallet");
 
-contract('Forwarder contract', (accounts) => {
-  const RELAYER = accounts[0];
+const zeroAddress = '0x0000000000000000000000000000000000000000';
 
-  let EOAs = []
-  let smartWalletContract;
-  let forwarderContract;
+contract('Forwarder', async (accounts) => {
+  const faucet = accounts[0];
+
+  let rocksideAdmin;
+  let rocksideRelayer;
+  let randomAccount;
+
+  let authorizedRelayers;
+  let forwarder;
+
+  const createAccount = async (eth = '10') => {
+    const account = await web3.eth.personal.newAccount();
+    await web3.eth.personal.unlockAccount(account);
+    await web3.eth.sendTransaction({
+      from: faucet,
+      to: account,
+      value: web3.utils.toWei(eth),
+    });
+
+    return account;
+  }
 
   before(async () => {
-    for (var i = 0; i < 5; i++) {
-      EOAs[i] = web3.eth.accounts.create();
-    }
-    authorizedRelayersContract = await AuthorizedRelayers.new([RELAYER], { from: RELAYER });
-    forwarderContract = await Forwarder.new(authorizedRelayersContract.address, [], { from: RELAYER });
-    smartWalletContract = await SmartWallet.new(EOAs[0].address, forwarderContract.address, { from: RELAYER });
+    rocksideAdmin = await createAccount();
+    rocksideRelayer = await createAccount();
+    randomAccount = await createAccount();
+
+    authorizedRelayers =
+      await AuthorizedRelayers.new([rocksideRelayer], { from: rocksideAdmin });
+  });
+
+  beforeEach(async () => {
+    forwarder = await
+      Forwarder.new(
+        authorizedRelayers.address, [zeroAddress],
+        { from: rocksideAdmin },
+      );
 
     await web3.eth.sendTransaction({
-      from: accounts[0],
-      to: smartWalletContract.address,
-      value: web3.utils.toWei('1', 'ether'),
-    });
-    await web3.eth.sendTransaction({
-      from: accounts[0],
-      to: forwarderContract.address,
-      value: web3.utils.toWei('1', 'ether'),
+      from: faucet,
+      to: forwarder.address,
+      value: web3.utils.toWei('1'),
     });
   });
 
-  it('should forward a meta tx to a smartwallet', async () => {
-    const signer = EOAs[0];
+  describe('constructor', async () => {
+    it('should initialize the Forwarder', async () => {
+      const forwarder = await
+        Forwarder.new(authorizedRelayers.address, [zeroAddress], { from: rocksideAdmin });
 
-    const metatx = {
-      destination: smartWalletContract.address,
-      data: smartWalletContract.contract.methods.execute('0x0000000000000000000000000000000000000000', '0x0', '0x').encodeABI(),
-      gasPrice: 1,
-      nonce: await getNonceForChannel(signer.address, 0),
-    };
-
-    const signature = await signMetaTx({
-      ...metatx,
-      signer,
-      relayer: RELAYER,
+      assert.equal(await forwarder.relayers(), authorizedRelayers.address);
+      assert.equal(await forwarder.trustedContracts(zeroAddress), true);
+      assert.equal(await forwarder.initialized(), true);
     });
 
-    /* FIXME: this will always revert. We need to retrieve the return data
-    const estimation = await forwarderContract.contract.methods.estimateForward(
-      signature, signer.address, metatx.destination,
-      metatx.data, metatx.gasPrice,
-      metatx.nonce
-    ).estimateGas({ from: forwarderContract.address, gasPrice: 1 })
-    */
+    it('should not reinitialize the Forwarder if we call initialize twice', async () => {
 
-    const res = await forwarderContract.forward(
-      signature, signer.address, metatx.destination,
-      metatx.data, metatx.gasPrice,
-      metatx.nonce,
-      { from: RELAYER }
-    );
-  });
+      const forwarder = await
+        Forwarder.new(authorizedRelayers.address, [zeroAddress], { from: rocksideAdmin });
 
-  it.skip('should estimate meta tx with invalid nonce', async () => {
-    const signer = EOAs[0];
-
-    const futurMetatx = {
-      destination: smartWalletContract.address,
-      data: smartWalletContract.contract.methods.execute('0x0000000000000000000000000000000000000000', '0x0', '0x').encodeABI(),
-      gasPrice: 1,
-      nonce: '0x' + (new Number(await getNonceForChannel(signer.address, 0)) + 1).toString(16),
-    };
-
-    const futurSignature = await signMetaTx({
-      ...futurMetatx,
-      signer,
-      relayer: RELAYER,
-    });
-
-    const estimation = await forwarderContract.contract.methods.estimateForward(
-      futurSignature, signer.address, futurMetatx.destination,
-      futurMetatx.data, futurMetatx.gasPrice,
-      futurMetatx.nonce
-    ).estimateGas({ from: forwarderContract.address, gasPrice: 10 })
-
-    const metatx = {
-      destination: smartWalletContract.address,
-      data: smartWalletContract.contract.methods.execute('0x0000000000000000000000000000000000000000', '0x0', '0x').encodeABI(),
-      gasPrice: 1,
-      nonce: await getNonceForChannel(signer.address, 0),
-    };
-
-    const signature = await signMetaTx({
-      ...metatx,
-      signer,
-      relayer: RELAYER,
-    });
-
-    const res1 = await forwarderContract.forward(
-      signature, signer.address, metatx.destination,
-      metatx.data, metatx.gasPrice,
-      metatx.nonce,
-      { from: RELAYER }
-    );
-
-    const res2 = await forwarderContract.forward(
-      futurSignature, signer.address, futurMetatx.destination,
-      futurMetatx.data, futurMetatx.gasPrice,
-      futurMetatx.nonce,
-      { from: RELAYER }
-    );
-
-    assert.ok(estimation + 10000 > res2.receipt.cumulativeGasUsed);
-  });
-
-  it('should not allow to forward a meta tx to a smart wallet that is not owned by the signer', async () => {
-    const signer = EOAs[1];
-
-    const metatx = {
-      destination: smartWalletContract.address,
-      data: smartWalletContract.contract.methods.execute('0x0000000000000000000000000000000000000000', '0x0', '0x').encodeABI(),
-      gasPrice: 1,
-      nonce: await getNonceForChannel(signer.address, 0),
-    };
-
-    const signature = await signMetaTx({
-      ...metatx,
-      signer,
-      relayer: RELAYER,
-    });
-
-    try {
-      await forwarderContract.forward(
-        signature, signer.address, metatx.destination,
-        metatx.data, metatx.gasPrice,
-        metatx.nonce,
-        { from: RELAYER }
+      await assertRevertWith(
+        forwarder.initialize(rocksideAdmin, authorizedRelayers.address, [zeroAddress], { from: rocksideAdmin }),
+        'Contract already initialized'
       );
-      assert.isTrue(false);
-    } catch (e) {
-      if (e.reason != undefined) {
-        assert.equal('Account not an owner', e.reason);
-      } else {
-        assert.include(e.message, 'exited with an error (status 0)');
-      }
-    }
+    });
   });
 
+  describe('updateTrustedContracts', async () => {
+    let forwarder;
 
-  it('should not allow invalid destination', async () => {
-    const forwarderContract = await Forwarder.new(authorizedRelayersContract.address, ['0x0000000000000000000000000000000000000001'], { from: RELAYER });
-    const signer = EOAs[0];
-
-    const metatx = {
-      destination: smartWalletContract.address,
-      data: smartWalletContract.contract.methods.execute('0x0000000000000000000000000000000000000000', '0x0', '0x').encodeABI(),
-      gasPrice: 1,
-      nonce: await getNonceForChannel(signer.address, 0),
-    };
-
-    const signature = await signMetaTx({
-      ...metatx,
-      signer,
-      relayer: RELAYER,
+    beforeEach(async () => {
+      forwarder = await
+        Forwarder.new(authorizedRelayers.address, [zeroAddress], { from: rocksideAdmin });
     });
 
-    try {
-      const res = await forwarderContract.forward(
-        signature, signer.address,
-        metatx.destination, metatx.data, metatx.gasPrice, metatx.nonce,
-        { from: RELAYER }
+    it('should not allow a random person to update trusted contracts', async () => {
+      await assertRevertWith(
+        forwarder.updateTrustedContracts([zeroAddress], { from: randomAccount }),
+        'Sender is not an owner'
       );
-      assert.isTrue(false);
-    } catch (e) {
-      if (e.reason != undefined) {
-        assert.equal('Unauthorized destination', e.reason);
-      } else {
-        assert.include(e.message, 'exited with an error (status 0)');
-      }
-    }
+    });
+
+    it('should update trusted contracts if sender is admin', async () => {
+      const trusted = web3.eth.accounts.create().address;
+
+      await forwarder.updateTrustedContracts([trusted], { from: rocksideAdmin });
+
+      assert.equal(await forwarder.trustedContracts(trusted), true);
+    });
   });
 
-  const buildSmartWalletData = ({ destination, value, data }) =>
-      abi.rawEncode(['address', 'uint256', 'bytes'], destination, value, data);
+  describe('changeRelayersSource', async () => {
 
-  const signMetaTx = async ({ signer, destination, value, data, nonce }) => {
-    const hash = await forwarderContract.hashTxMessage(
-      signer.address, destination, data, nonce
-    );
+    it('should not allow a random person to update authorized relayers', async () => {
+      await assertRevertWith(
+        forwarder.changeRelayersSource(zeroAddress, { from: randomAccount }),
+        'Sender is not an owner'
+      );
+    });
 
-    const chainID = await web3.eth.net.getId();
-    const domain = {
-      chainId: chainID,
-      verifyingContract: forwarderContract.address,
+    it('should update trusted contracts if sender is admin', async () => {
+      const newAuthorized = web3.eth.accounts.create().address;
+
+      await forwarder.changeRelayersSource(newAuthorized, { from: rocksideAdmin });
+
+      assert.equal(await forwarder.relayers(), newAuthorized);
+    });
+  });
+
+  describe('withdraw', async () => {
+    it('should not allow a random person to withdraw funds', async () => {
+      await assertRevertWith(
+        forwarder.withdraw(1, { from: randomAccount }),
+        'Sender is not an owner'
+      );
+    });
+
+    it('should not allow an amount greater than the Forwarder balance', async () => {
+      const balance = await web3.eth.getBalance(forwarder.address);
+      await assertRevertWith(
+        forwarder.withdraw(balance+1, { from: rocksideAdmin }),
+        'Amount is too high'
+      );
+    });
+
+    it('should withdraw amount from Forwarder balance', async () => {
+      await forwarder.send(10, { from: rocksideAdmin });
+
+      const oldForwarderBalance = await web3.eth.getBalance(forwarder.address);
+      const oldOwnerBalance = await web3.eth.getBalance(rocksideAdmin);
+
+      // gasPrice to 0 so that we don't have to count gas usage in the assertion part
+      result = await forwarder.withdraw(5, { from: rocksideAdmin, gasPrice: 0 })
+
+      const forwarderBalance = await web3.eth.getBalance(forwarder.address);
+      const ownerBalance = await web3.eth.getBalance(rocksideAdmin);
+
+      assert.equal(BigInt(forwarderBalance).toString(), (BigInt(oldForwarderBalance) - 5n).toString());
+      assert.equal(BigInt(ownerBalance).toString(), (BigInt(oldOwnerBalance)+5n).toString());
+    });
+  });
+
+  describe('forward', async () => {
+    const user = web3.eth.accounts.create();
+    const defaultMetaTx = {
+      to: zeroAddress,
+      data: '0x',
     };
+    const defaultGasPrice = 100;
 
-    const hashBuf = new Buffer(hash.substring(2), 'hex');
-    const messageToSign = ethUtil.keccak256(
-      Buffer.concat([
-        Buffer.from('1901', 'hex'),
-        structHash('EIP712Domain', domain),
-        hashBuf,
-      ])
-    );
+    it('should refuse a relayer that is not allowed', async () => {
+      const metaTx = {
+        ...defaultMetaTx,
+        nonce: await getNonce(forwarder, user),
+      };
+      const signature = await signMetaTx(forwarder, user, metaTx);
 
-    const privateKey = new Buffer(signer.privateKey.substring(2), 'hex');
-    const sig = await ethUtil.ecsign(messageToSign, privateKey);
-    const signature = ethUtil.toRpcSig(sig.v, sig.r, sig.s);
+      await assertRevertWith(
+        forwarder.forward(
+          signature, user.address, metaTx.to, metaTx.data, defaultGasPrice, metaTx.nonce,
+          { from: rocksideAdmin }
+        ),
+        'Invalid sender'
+      );
+    });
 
-    return signature;
-  }
+    it('should refuse a destination contract if it is not a trusted contract', async () => {
+      const metaTx = {
+        ...defaultMetaTx,
+        nonce: await getNonce(forwarder, user),
 
-  const getNonceForChannel = async (signer, channel) => {
-    const channelNonce = await forwarderContract.channels(signer, channel)
+        to: randomAccount,
+      };
+      const signature = await signMetaTx(forwarder, user, metaTx);
 
-    const nonceValue = BigInt(channelNonce) + (BigInt(channel) * (2n ** 128n));
-    return '0x' + nonceValue.toString(16)
-  }
+      await assertRevertWith(
+        forwarder.forward(
+          signature, user.address, metaTx.to, metaTx.data, defaultGasPrice, metaTx.nonce,
+          { from: rocksideRelayer }
+        ),
+        'Unauthorized destination'
+      );
+    });
+
+    it('should refuse a meta tx with a nonce too low', async () => {
+      const metaTx = {
+        ...defaultMetaTx,
+        nonce: await getNonce(forwarder, user),
+      };
+      const signature = await signMetaTx(forwarder, user, metaTx);
+
+      await forwarder.forward(
+        signature, user.address, metaTx.to, metaTx.data, defaultGasPrice, metaTx.nonce,
+        { from: rocksideRelayer }
+      );
+      
+      await assertRevertWith(
+        forwarder.forward(
+          signature, user.address, metaTx.to, metaTx.data, defaultGasPrice, metaTx.nonce,
+          { from: rocksideRelayer }
+        ),
+        'Nonce is invalid',
+      );
+    });
+
+    it('should refuse a meta tx with a nonce too high', async () => {
+      const metaTx = {
+        ...defaultMetaTx,
+        nonce: 1,
+      };
+      const signature = await signMetaTx(forwarder, user, metaTx);
+      
+      await assertRevertWith(
+        forwarder.forward(
+          signature, user.address, metaTx.to, metaTx.data, defaultGasPrice, metaTx.nonce,
+          { from: rocksideRelayer }
+        ),
+        'Nonce is invalid',
+      );
+    });
+
+    it('should forward the meta tx', async () => {
+      const metaTx = {
+        ...defaultMetaTx,
+        nonce: await getNonce(forwarder, user),
+      };
+      const signature = await signMetaTx(forwarder, user, metaTx);
+
+      const result = await forwarder.forward(
+        signature, user.address, metaTx.to, metaTx.data, defaultGasPrice, metaTx.nonce,
+        { from: rocksideRelayer }
+      );
+
+      const forwardedEvent = result.logs.find(log => log.event === 'Forwarded');
+      assert.exists(forwardedEvent);
+    });
+
+    it('should forward the meta tx on another channel', async () => {
+      const metaTx = {
+        ...defaultMetaTx,
+        nonce: await getNonce(forwarder, user),
+      };
+      const signature = await signMetaTx(forwarder, user, metaTx);
+
+      await forwarder.forward(
+        signature, user.address, metaTx.to, metaTx.data, defaultGasPrice, metaTx.nonce,
+        { from: rocksideRelayer }
+      );
+
+      const otherChannel = {
+        ...defaultMetaTx,
+        nonce: await getNonce(forwarder, user, '1'),
+      }
+
+      const otherChannelSig = await signMetaTx(forwarder, user, otherChannel);
+
+      await forwarder.forward(
+        otherChannelSig, user.address, otherChannel.to, otherChannel.data, defaultGasPrice, otherChannel.nonce,
+        { from: rocksideRelayer }
+      );
+    });
+
+    it('should refund the relayer', async () => {
+      const metaTx = {
+        ...defaultMetaTx,
+        nonce: await getNonce(forwarder, user),
+      };
+      const signature = await signMetaTx(forwarder, user, metaTx);
+
+      const forwarderBalance = BigInt(await web3.eth.getBalance(forwarder.address));
+      const relayerBalance = BigInt(await web3.eth.getBalance(rocksideRelayer));
+
+      const result = await forwarder.forward(
+        signature, user.address, metaTx.to, metaTx.data, defaultGasPrice, metaTx.nonce,
+        { from: rocksideRelayer, gasPrice: defaultGasPrice }
+      );
+
+      const endForwarderBalance = BigInt(await web3.eth.getBalance(forwarder.address));
+      const endRelayerBalance = BigInt(await web3.eth.getBalance(rocksideRelayer));
+
+      const forwarderPaid = forwarderBalance-endForwarderBalance
+      const relayerPaid = relayerBalance-endRelayerBalance
+
+      const forwardedEvent = result.logs.find(log => log.event === 'Forwarded');
+      assert.exists(forwardedEvent);
+
+      const refund = BigInt(forwardedEvent.args.gasUsed) * BigInt(defaultGasPrice);
+
+      const txCost = BigInt(result.receipt.gasUsed) * BigInt(defaultGasPrice)
+
+      const expectedForwardedBalance = forwarderBalance - refund;
+      assert.equal(endForwarderBalance, expectedForwardedBalance);
+
+      const expectedRelayerBalance = relayerBalance - txCost + refund
+      assert.equal(endRelayerBalance, expectedRelayerBalance);
+    });
+
+    it('should refund at most gasPriceLimit as gas price', async () => {
+      const lowGasPrice = 100;
+      const highGasPrice = 1000;
+
+      const metaTx = {
+        ...defaultMetaTx,
+        nonce: await getNonce(forwarder, user),
+      };
+      const signature = await signMetaTx(forwarder, user, metaTx);
+
+      const forwarderBalance = BigInt(await web3.eth.getBalance(forwarder.address));
+      const relayerBalance = BigInt(await web3.eth.getBalance(rocksideRelayer));
+
+      const result = await forwarder.forward(
+        signature, user.address, metaTx.to, metaTx.data, lowGasPrice, metaTx.nonce,
+        { from: rocksideRelayer, gasPrice: highGasPrice }
+      );
+
+      const endForwarderBalance = BigInt(await web3.eth.getBalance(forwarder.address));
+      const endRelayerBalance = BigInt(await web3.eth.getBalance(rocksideRelayer));
+
+      const forwarderPaid = forwarderBalance-endForwarderBalance
+      const relayerPaid = relayerBalance-endRelayerBalance
+
+      const forwardedEvent = result.logs.find(log => log.event === 'Forwarded');
+      assert.exists(forwardedEvent);
+
+      const refund = BigInt(forwardedEvent.args.gasUsed) * BigInt(lowGasPrice);
+
+      const txCost = BigInt(result.receipt.gasUsed) * BigInt(highGasPrice)
+
+      const expectedForwardedBalance = forwarderBalance - refund;
+      assert.equal(endForwarderBalance, expectedForwardedBalance);
+
+      const expectedRelayerBalance = relayerBalance - txCost + refund
+      assert.equal(endRelayerBalance, expectedRelayerBalance);
+    });
+
+    it('should refund at tx.gasPrice if it is lower than gasPriceLimit', async () => {
+      const lowGasPrice = 100;
+      const highGasPrice = 1000;
+
+      const metaTx = {
+        ...defaultMetaTx,
+        nonce: await getNonce(forwarder, user),
+      };
+      const signature = await signMetaTx(forwarder, user, metaTx);
+
+      const forwarderBalance = BigInt(await web3.eth.getBalance(forwarder.address));
+      const relayerBalance = BigInt(await web3.eth.getBalance(rocksideRelayer));
+
+      const result = await forwarder.forward(
+        signature, user.address, metaTx.to, metaTx.data, highGasPrice, metaTx.nonce,
+        { from: rocksideRelayer, gasPrice: lowGasPrice }
+      );
+
+      const endForwarderBalance = BigInt(await web3.eth.getBalance(forwarder.address));
+      const endRelayerBalance = BigInt(await web3.eth.getBalance(rocksideRelayer));
+
+      const forwarderPaid = forwarderBalance-endForwarderBalance
+      const relayerPaid = relayerBalance-endRelayerBalance
+
+      const forwardedEvent = result.logs.find(log => log.event === 'Forwarded');
+      assert.exists(forwardedEvent);
+
+      const refund = BigInt(forwardedEvent.args.gasUsed) * BigInt(lowGasPrice);
+
+      const txCost = BigInt(result.receipt.gasUsed) * BigInt(lowGasPrice)
+
+      const expectedForwardedBalance = forwarderBalance - refund;
+      assert.equal(endForwarderBalance, expectedForwardedBalance);
+
+      const expectedRelayerBalance = relayerBalance - txCost + refund
+      assert.equal(endRelayerBalance, expectedRelayerBalance);
+    });
+
+    it('should not be possible to upgrade the implementation using a forward', async () => {
+      const forwarder = await
+        Forwarder.new(authorizedRelayers.address, [], { from: rocksideAdmin });
+
+      await forwarder.updateOwners(user.address, true, { from: rocksideAdmin });
+
+      const metaTx = {
+        nonce: await getNonce(forwarder, user),
+
+        to: forwarder.address,
+        data: await forwarder.contract.methods.upgradeTo(randomAccount).encodeABI(),
+      };
+      const signature = await signMetaTx(forwarder, user, metaTx);
+
+      await assertRevertWith(
+        forwarder.forward(
+          signature, user.address, metaTx.to, metaTx.data, defaultGasPrice, metaTx.nonce,
+          { from: rocksideRelayer }
+        ),
+        'Sender is not an owner'
+      );
+    });
+
+  });
+
+  describe('upgradeTo', async () => {
+    const newImplementation = '0x0000000000000000000000000000000000000001';
+
+    it('should refuse a sender that is not owner', async () => {
+      await assertRevertWith(
+        forwarder.upgradeTo(newImplementation, { from: randomAccount }),
+        'Sender is not an owner'
+      );
+    });
+
+    it('should change the implementation address if sender is a owner', async () => {
+      await forwarder.upgradeTo(newImplementation, { from: rocksideAdmin })
+      assert.equal(await forwarder.implementation(), newImplementation);
+    });
+
+    it('should revert if address is the current implementation', async () => {
+      await assertRevertWith(
+        forwarder.upgradeTo(zeroAddress, { from: rocksideAdmin }),
+        'Implementation already used'
+      );
+    });
+  });
+
+  describe('updateOwners', async () => {
+    const newOwner = '0x0000000000000000000000000000000000000001';
+
+    it('should refuse a sender that is not owner', async () => {
+      await assertRevertWith(
+        forwarder.updateOwners(newOwner, true,{ from: randomAccount }),
+        'Sender is not an owner'
+      );
+    });
+
+    it('should update the owner if sender is a owner itself', async () => {
+      await forwarder.updateOwners(newOwner, true, { from: rocksideAdmin })
+      assert.equal(await forwarder.owners(newOwner), true);
+    });
+  });
 });
-
-const types = {
-  EIP712Domain: [
-    { type: "address", name: "verifyingContract" },
-    { type: "uint256", name: "chainId" }
-  ]
-};
-
-// Recursively finds all the dependencies of a type
-function dependencies(primaryType, found = []) {
-    if (found.includes(primaryType)) {
-        return found;
-    }
-    if (types[primaryType] === undefined) {
-        return found;
-    }
-    found.push(primaryType);
-    for (let field of types[primaryType]) {
-        for (let dep of dependencies(field.type, found)) {
-            if (!found.includes(dep)) {
-                found.push(dep);
-            }
-        }
-    }
-    return found;
-}
-
-function encodeType(primaryType) {
-    // Get dependencies primary first, then alphabetical
-    let deps = dependencies(primaryType);
-    deps = deps.filter(t => t != primaryType);
-    deps = [primaryType].concat(deps.sort());
-    // Format as a string with fields
-    let result = '';
-    for (let type of deps) {
-        result += `${type}(${types[type].map(({ name, type }) => `${type} ${name}`).join(',')})`;
-    }
-    return result;
-}
-
-function typeHash(primaryType) {
-    return ethUtil.keccak256(encodeType(primaryType));
-}
-
-function encodeData(primaryType, data) {
-    let encTypes = [];
-    let encValues = [];
-    // Add typehash
-    encTypes.push('bytes32');
-    encValues.push(typeHash(primaryType));
-    // Add field contents
-    for (let field of types[primaryType]) {
-        let value = data[field.name];
-        if (field.type == 'string' || field.type == 'bytes') {
-            encTypes.push('bytes32');
-            value = ethUtil.keccak256(value);
-            encValues.push(value);
-        } else if (types[field.type] !== undefined) {
-            encTypes.push('bytes32');
-            value = ethUtil.keccak256(encodeData(field.type, value));
-            encValues.push(value);
-        } else if (field.type.lastIndexOf(']') === field.type.length - 1) {
-            throw 'TODO: Arrays currently unimplemented in encodeData';
-        } else {
-            encTypes.push(field.type);
-            encValues.push(value);
-        }
-    }
-    return abi.rawEncode(encTypes, encValues);
-}
-
-function structHash(primaryType, data) {
-    return ethUtil.keccak256(encodeData(primaryType, data));
-}

@@ -73,7 +73,7 @@ npm install
 We have a known issue with `ganache-cli` `ecrecover` ([more details](https://docs.kaleido.io/faqs/why-ecrecover-fails/)), you must use [geth](https://geth.ethereum.org/docs/install-and-build/installing-geth) as blockchain
 
 ```
-geth --dev --datadir temp --rpc
+geth --dev --datadir temp --rpc --rpcapi net,eth,web3b,personal --allow-insecure-unlock console
 ```
 
 Run truffle test
