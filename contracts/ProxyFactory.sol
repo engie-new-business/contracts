@@ -7,8 +7,11 @@ contract ProxyFactory {
 
     event ProxyCreation(Proxy proxy);
 
+    /// @dev Forwards a meta transaction to a destination contract
+    /// @param implementation Address of the contract to proxy
+    /// @param data Payload for message call sent to new proxy contract.
     function createProxy(address implementation, bytes memory data)
-        public
+        external
         payable
         returns (Proxy proxy)
     {
@@ -21,8 +24,12 @@ contract ProxyFactory {
         emit ProxyCreation(proxy);
     }
 
+    /// @dev Forwards a meta transaction to a destination contract
+    /// @param implementation Address of the contract to proxy
+    /// @param data Payload for message call sent to new proxy contract.
+    /// @param saltNonce Nonce that will be used to generate the salt to calculate the address of the new proxy contract.
     function createProxyWithNonce(address implementation, bytes memory data, bytes32 saltNonce)
-        public
+        external
         payable
         returns (Proxy proxy)
     {

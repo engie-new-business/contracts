@@ -59,7 +59,7 @@ contract Forwarder is Implementation, OwnersMap {
 		return channels[signer][channel];
 	}
 
-	function updateTrustedContracts(address[] memory contracts) public {
+	function updateTrustedContracts(address[] memory contracts) external {
 		require(owners[msg.sender], "Sender is not an owner");
 		hasTrustedContracts = true;
 		for(uint256 i = 0; i < contracts.length; i++) {
@@ -67,13 +67,13 @@ contract Forwarder is Implementation, OwnersMap {
 		}
 	}
 
-	function changeRelayersSource(address relayersAddress) public {
+	function changeRelayersSource(address relayersAddress) external {
 		require(owners[msg.sender], "Sender is not an owner");
 		relayers = AuthorizedRelayers(relayersAddress);
 	}
 
 	/// @dev Owners of this Forwarder can withdraw funds
-	function withdraw(uint amount) public {
+	function withdraw(uint amount) external {
 		require(owners[msg.sender], "Sender is not an owner");
 		require(amount <= address(this).balance, "Amount is too high");
 		msg.sender.transfer(amount);
@@ -97,7 +97,7 @@ contract Forwarder is Implementation, OwnersMap {
 		uint256 nonce
 	)
 		isWhitelisted
-		public
+		external
 	{
 		require(
 			!hasTrustedContracts || trustedContracts[address(to)],

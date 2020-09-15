@@ -17,24 +17,24 @@ contract AuthorizedRelayers {
 		}
 	}
 
-	function add(address[] memory senders) public onlyOwner {
+	function add(address[] memory senders) external onlyOwner {
 		for(uint16 i; i < senders.length; i++) {
 			whitelist[senders[i]] = true;
 		}
 	}
 
-	function remove(address[] memory senders) public onlyOwner {
+	function remove(address[] memory senders) external onlyOwner {
 		for(uint16 i; i < senders.length; i++) {
 			whitelist[senders[i]] = false;
 		}
 	}
 
-	function transferOwnership(address newOwner) public onlyOwner {
+	function transferOwnership(address newOwner) external onlyOwner {
 		require(newOwner != address(0), "new owner is the zero address");
 		owner = newOwner;
 	}
 
-	function verify(address sender) public view returns (bool) {
+	function verify(address sender) external view returns (bool) {
 		return whitelist[sender];
 	}
 }
