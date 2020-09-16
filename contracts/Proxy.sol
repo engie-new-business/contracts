@@ -5,13 +5,16 @@ pragma solidity >=0.6.0 <0.7.0;
 contract Proxy {
 
     // implementation always needs to be first declared variable, to ensure that it is at the same location in the contracts to which calls are delegated.
-    // For this purpose those contracts need to first heritate of Implementation class (Implementation.sol)
+    // For this purpose, these contracts must first inherit from Implementation class (Implementation.sol)
     address public implementation;
 
+    /// @dev Constructor function sets address of implementation contract.
+    /// @param _implementation Implemation address.
     constructor(address _implementation) payable public {
         implementation = _implementation;
     }
 
+    /// @dev Fallback function forwards all transactions and returns all received return data.
     fallback() external payable {
         address _impl = implementation;
 
