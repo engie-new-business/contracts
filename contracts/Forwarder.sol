@@ -37,8 +37,9 @@ contract Forwarder is Implementation, OwnersMap {
 
 	/// @dev Initialize function sets initial storage of contract. Should be call when instancied from factory
 	/// @param owner owner of the forwarder
-    /// @param relayersAddress address of the contract that provide authorized relayer adresses
+    	/// @param relayersAddress address of the contract that provide authorized relayer adresses
 	/// @param _trustedContracts List of authorized destination for forward. Empty array to authorize all destinations
+	// If deployed with a Factory, this method must be called in the same transaction to avoid a possible front-running attack
     function initialize(address owner, address relayersAddress, address[] memory _trustedContracts) public {
 		require(!initialized, "Contract already initialized");
 		initialized = true;
