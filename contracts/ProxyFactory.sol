@@ -10,6 +10,7 @@ contract ProxyFactory {
     /// @dev Forwards a meta transaction to a destination contract
     /// @param implementation Address of the contract to proxy
     /// @param data Payload for message call sent to new proxy contract.
+    // The initialization method of implementation must be called in the same transaction as the constructor to avoid a possible front-running attack
     function createProxy(address implementation, bytes memory data)
         external
         payable
@@ -28,6 +29,7 @@ contract ProxyFactory {
     /// @param implementation Address of the contract to proxy
     /// @param data Payload for message call sent to new proxy contract.
     /// @param saltNonce Nonce that will be used to generate the salt to calculate the address of the new proxy contract.
+    // The initialization method of implementation must be called in the same transaction as the constructor to avoid a possible front-running attack
     function createProxyWithNonce(address implementation, bytes memory data, bytes32 saltNonce)
         external
         payable
