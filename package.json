@@ -8,7 +8,7 @@
     "eth-typed-data": "^0.1.0-beta.0",
     "ethereumjs-abi": "^0.6.8",
     "ethereumjs-util": "^6.2.0",
-    "truffle": "^5.1.11"
+    "truffle": "^5.8.4"
   },
   "devDependencies": {
     "@openzeppelin/contracts": "^3.1.0"
